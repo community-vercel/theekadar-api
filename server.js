@@ -5,7 +5,6 @@ const fileUpload = require('express-fileupload');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 const morgan = require('morgan');
 const compression = require('compression');
@@ -63,9 +62,6 @@ app.use(
     safeFileNames: true,
   })
 );
-
-// Sanitize req.body and req.params to prevent NoSQL injection
-app.use(mongoSanitize());
 
 // Prevent HTTP parameter pollution
 app.use(hpp());
