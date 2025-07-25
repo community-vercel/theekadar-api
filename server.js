@@ -6,19 +6,16 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const hpp = require('hpp');
 const morgan = require('morgan');
 const compression = require('compression');
 const csurf = require('csurf');
-
 
 connectDB();
 
 const app = express();
 app.use(
   helmet({
-
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -32,7 +29,7 @@ app.use(
   })
 );
 
-// 2. Enable CORS with strict configuration
+// Enable CORS with strict configuration
 app.use(
   cors({
     origin: '*',
@@ -41,10 +38,10 @@ app.use(
   })
 );
 
-// 3. Trust proxies for serverless environments
+// Trust proxies for serverless environments
 app.set('trust proxy', 1);
 
-// 4. Rate limiting to prevent brute-force and DDoS attacks
+// Rate limiting to prevent brute-force and DDoS attacks
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -54,11 +51,11 @@ app.use(
   })
 );
 
-// 5. Body parser with size limit
+// Body parser with size limit
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// 6. File upload with restrictions
+// File upload with restrictions
 app.use(
   fileUpload({
     limits: { fileSize: 30 * 1024 * 1024 },
@@ -67,18 +64,19 @@ app.use(
   })
 );
 
+// Sanitize req.body and req.params to prevent NoSQL injection
+app.use(mongoSanitize());
 
-
-// 10. Prevent HTTP parameter pollution
+// Prevent HTTP parameter pollution
 app.use(hpp());
 
-// 11. Enable compression for faster responses
+// Enable compression for faster responses
 app.use(compression());
 
-// 12. CSRF protection for state-changing requests
+// CSRF protection for state-changing requests
 app.use(csurf({ cookie: { secure: true, httpOnly: true, sameSite: 'Strict' } }));
 
-// 13. Request logging for monitoring (in development only)
+// Request logging for monitoring (in development only)
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
@@ -92,7 +90,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/users', require('./routes/users'));
 
-// 14. Handle CSRF errors
+// Handle CSRF errors
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ error: 'Invalid CSRF token' });
@@ -100,7 +98,7 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// 15. Enhanced error handling middleware
+// Enhanced error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   const statusCode = err.statusCode || 500;
@@ -111,7 +109,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 16. Handle 404 for unknown routes
+// Handle 404 for unknown routes
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
@@ -119,7 +117,7 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// 17. Graceful shutdown
+// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   server.close(() => {
@@ -127,4 +125,3 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
-
