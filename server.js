@@ -61,11 +61,11 @@ app.use(
 app.use(hpp());
 app.use(compression());
 
+
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// Routes
 app.use('/api/auth',authroutes);
 app.use('/api/workers', require('./routes/worker'));
 app.use('/api/bookings', require('./routes/bookings'));
