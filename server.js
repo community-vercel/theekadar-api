@@ -12,10 +12,14 @@ const morgan = require('morgan');
 const compression = require('compression');
 const csurf = require('csurf');
 
+// Load environment variables
+
+// Connect to MongoDB
 connectDB();
 
 const app = express();
 
+// 1. Enable Helmet for secure HTTP headers
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -138,4 +142,5 @@ process.on('SIGTERM', () => {
 });
 
 // AWS Lambda handler
+const serverless = require('serverless-http');
 module.exports.handler = serverless(app);
