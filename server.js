@@ -28,7 +28,6 @@ app.use(
   })
 );
 
-// Enable CORS with strict configuration
 app.use(
   cors({
     origin: '*',
@@ -37,24 +36,20 @@ app.use(
   })
 );
 
-// Trust proxies for serverless environments
 app.set('trust proxy', 1);
 
-// Rate limiting to prevent brute-force and DDoS attacks
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    max: 100,
     standardHeaders: true,
     legacyHeaders: false,
   })
 );
 
-// Body parser with size limit
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// File upload with restrictions
 app.use(
   fileUpload({
     limits: { fileSize: 30 * 1024 * 1024 },
@@ -63,15 +58,9 @@ app.use(
   })
 );
 
-// Prevent HTTP parameter pollution
 app.use(hpp());
-
-// Enable compression for faster responses
 app.use(compression());
 
-// CSRF protection for state-changing requests
-
-// Request logging for monitoring (in development only)
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
@@ -84,6 +73,13 @@ app.use('/api/services', require('./routes/services'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/users', require('./routes/users'));
+
+// Handle 404 for unknown routes
+app.use((req, res, next) => {
+  res.status(404).json({
+    error: `Route ${req.method} ${req.url} not found`,
+  });
+});
 
 // Handle CSRF errors
 app.use((err, req, res, next) => {
@@ -103,10 +99,6 @@ app.use((err, req, res, next) => {
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
   });
 });
-
-// Handle 404 for unknown routes
-
-
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
