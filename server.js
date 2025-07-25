@@ -70,7 +70,6 @@ app.use(hpp());
 app.use(compression());
 
 // CSRF protection for state-changing requests
-app.use(csurf({ cookie: { secure: true, httpOnly: true, sameSite: 'Strict' } }));
 
 // Request logging for monitoring (in development only)
 if (process.env.NODE_ENV !== 'production') {
