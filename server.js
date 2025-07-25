@@ -16,7 +16,6 @@ connectDB();
 
 const app = express();
 
-// 1. Enable Helmet for secure HTTP headers
 app.use(
   helmet({
     contentSecurityPolicy: {
