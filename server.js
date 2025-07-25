@@ -16,10 +16,9 @@ const csurf = require('csurf');
 connectDB();
 
 const app = express();
-
-
 app.use(
   helmet({
+    
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
