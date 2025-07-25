@@ -9,7 +9,7 @@ const hpp = require('hpp');
 const morgan = require('morgan');
 const compression = require('compression');
 const csurf = require('csurf');
-
+const authroutes = require('./routes/auth');
 connectDB();
 
 const app = express();
@@ -66,7 +66,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
+app.use('/api/auth',authroutes);
 app.use('/api/workers', require('./routes/worker'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/services', require('./routes/services'));

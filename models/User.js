@@ -1,4 +1,3 @@
-
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -17,9 +16,12 @@ const userSchema = new mongoose.Schema({
   isVerified: { type: Boolean, default: false },
   verificationDocuments: [{
     type: { type: String, enum: ['id_proof', 'certification', 'license'] },
-    url: String, // Vercel Blob URL
+    url: String,
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     uploadedAt: { type: Date, default: Date.now },
   }],
   createdAt: { type: Date, default: Date.now },
 });
+
+const User = mongoose.model('User', userSchema);
+module.exports = User;
