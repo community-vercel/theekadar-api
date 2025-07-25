@@ -34,6 +34,11 @@ const workerSchema = Joi.object({
   experience: Joi.number().min(0).required(),
   hourlyRate: Joi.number().min(0).required(),
   location: Joi.string().required(),
+  profileImage: Joi.object({
+    data: Joi.string().required(),  // base64 string
+    name: Joi.string().required(),  // filename
+    type: Joi.string().valid('image/jpeg', 'image/png').required(),  // mime type
+  })
 });
 
 const serviceSchema = Joi.object({

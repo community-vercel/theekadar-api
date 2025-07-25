@@ -77,6 +77,7 @@ const deleteService = async (req, res) => {
   }
 };
 
+
 const searchServices = async (req, res) => {
   const { category, lat, lng, maxDistance } = req.query;
 
