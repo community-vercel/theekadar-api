@@ -40,13 +40,14 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   credentials: false // Set to true only if you need to support cookies/auth
 }));
-
+app.set('trust proxy', 1); // Trust the first proxy
 // 3. Rate limiting to prevent brute-force and DDoS attacks
-const limiter = rateLimit({
+app.use(rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Limit each IP to 100 requests per window
-  message: 'Too many requests from this IP, please try again later.',
-});
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+}));
 app.use('/api/', limiter);
 
 // 4. Body parser with size limit
