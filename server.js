@@ -3,17 +3,16 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const fileUpload = require('express-fileupload');
 const cors = require('cors');
-const helmet = require('helmet'); // Security headers
-const rateLimit = require('express-rate-limit'); // Rate limiting
-const mongoSanitize = require('express-mongo-sanitize'); // Prevent NoSQL injection
-const xss = require('xss-clean'); // Prevent XSS attacks
-const hpp = require('hpp'); // Prevent HTTP parameter pollution
-const morgan = require('morgan'); // Logging
-const compression = require('compression'); // Gzip compression
-const csurf = require('csurf'); // CSRF protection
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
+const morgan = require('morgan');
+const compression = require('compression');
+const csurf = require('csurf');
 
 // Load environment variables
-dotenv.config();
 
 // Connect to MongoDB
 connectDB();
@@ -21,58 +20,66 @@ connectDB();
 const app = express();
 
 // 1. Enable Helmet for secure HTTP headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+      },
     },
-  },
-  xssFilter: true,
-  noSniff: true,
-  hidePoweredBy: true,
-}));
+    xssFilter: true,
+    noSniff: true,
+    hidePoweredBy: true,
+  })
+);
 
 // 2. Enable CORS with strict configuration
-app.use(cors({
-  origin: '*', // Allow all origins
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  credentials: false // Set to true only if you need to support cookies/auth
-}));
-app.set('trust proxy', 1); // Trust the first proxy
-// 3. Rate limiting to prevent brute-force and DDoS attacks
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-}));
-app.use('/api/', limiter);
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    credentials: false,
+  })
+);
 
-// 4. Body parser with size limit
+// 3. Trust proxies for serverless environments
+app.set('trust proxy', 1);
+
+// 4. Rate limiting to prevent brute-force and DDoS attacks
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
+
+// 5. Body parser with size limit
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// 5. File upload with restrictions
-app.use(fileUpload({
-  limits: { fileSize: 30 * 1024 * 1024 }, // Limit file size to 5MB
-  abortOnLimit: true,
-  safeFileNames: true, // Prevent directory traversal
-fileTypes: /\.(jpeg|jpg|png|webp|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|mp4|mp3|avi|mov|svg)$/i,
-}));
+// 6. File upload with restrictions
+app.use(
+  fileUpload({
+    limits: { fileSize: 30 * 1024 * 1024 }, // Limit file size to 30MB
+    abortOnLimit: true,
+    safeFileNames: true,
+    fileTypes: /\.(jpeg|jpg|png|webp|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|mp4|mp3|avi|mov|svg)$/i,
+  })
+);
 
-// 6. Sanitize data to prevent NoSQL injection and XSS
+// 7. Sanitize data to prevent NoSQL injection and XSS
 app.use(mongoSanitize());
 app.use(xss());
 
-// 7. Prevent HTTP parameter pollution
+// 8. Prevent HTTP parameter pollution
 app.use(hpp());
 
-// 8. Enable compression for faster responses
+// 9. Enable compression for faster responses
 app.use(compression());
-
-// 9. Parse cookies for secure sessions
 
 // 10. CSRF protection for state-changing requests
 app.use(csurf({ cookie: { secure: true, httpOnly: true, sameSite: 'Strict' } }));
@@ -106,7 +113,7 @@ app.use((err, req, res, next) => {
   const message = process.env.NODE_ENV === 'production' ? 'Something went wrong!' : err.message;
   res.status(statusCode).json({
     error: message,
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }), // Detailed errors in development
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
   });
 });
 
