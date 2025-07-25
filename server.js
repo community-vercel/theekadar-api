@@ -12,6 +12,9 @@ const morgan = require('morgan');
 const compression = require('compression');
 const csurf = require('csurf');
 
+// Load environment variables
+
+// Connect to MongoDB
 connectDB();
 
 const app = express();
@@ -61,27 +64,34 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // 6. File upload with restrictions
 app.use(
   fileUpload({
-    limits: { fileSize: 30 * 1024 * 1024 }, // Limit file size to 30MB
+    limits: { fileSize: 30 * 1024 * 1024 },
     abortOnLimit: true,
     safeFileNames: true,
-    fileTypes: /\.(jpeg|jpg|png|webp|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|mp4|mp3|avi|mov|svg)$/i,
   })
 );
 
-// 7. Sanitize data to prevent NoSQL injection and XSS
+// 7. Custom middleware to sanitize req.query
+app.use((req, res, next) => {
+  req.sanitizedQuery = mongoSanitize.sanitize(req.query, { replaceWith: '_' });
+  next();
+});
+
+// 8. Sanitize req.body and req.params to prevent NoSQL injection
 app.use(mongoSanitize());
+
+// 9. Prevent XSS attacks
 app.use(xss());
 
-// 8. Prevent HTTP parameter pollution
+// 10. Prevent HTTP parameter pollution
 app.use(hpp());
 
-// 9. Enable compression for faster responses
+// 11. Enable compression for faster responses
 app.use(compression());
 
-// 10. CSRF protection for state-changing requests
+// 12. CSRF protection for state-changing requests
 app.use(csurf({ cookie: { secure: true, httpOnly: true, sameSite: 'Strict' } }));
 
-// 11. Request logging for monitoring (in development only)
+// 13. Request logging for monitoring (in development only)
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
@@ -95,7 +105,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/users', require('./routes/users'));
 
-// 12. Handle CSRF errors
+// 14. Handle CSRF errors
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ error: 'Invalid CSRF token' });
@@ -103,9 +113,9 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// 13. Enhanced error handling middleware
+// 15. Enhanced error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack); // Log errors securely
+  console.error(err.stack);
   const statusCode = err.statusCode || 500;
   const message = process.env.NODE_ENV === 'production' ? 'Something went wrong!' : err.message;
   res.status(statusCode).json({
@@ -114,7 +124,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 14. Handle 404 for unknown routes
+// 16. Handle 404 for unknown routes
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
@@ -122,7 +132,7 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// 15. Graceful shutdown
+// 17. Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   server.close(() => {
@@ -130,3 +140,6 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
+
+// AWS Lambda handler
+module.exports.handler = serverless(app);
