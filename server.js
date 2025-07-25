@@ -139,6 +139,3 @@ process.on('SIGTERM', () => {
   });
 });
 
-// AWS Lambda handler
-const serverless = require('serverless-http');
-module.exports.handler = serverless(app);
