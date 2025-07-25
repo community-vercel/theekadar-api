@@ -18,7 +18,7 @@ connectDB();
 const app = express();
 app.use(
   helmet({
-    
+
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -68,11 +68,6 @@ app.use(
 );
 
 
-
-// 8. Sanitize req.body and req.params to prevent NoSQL injection
-
-// 9. Prevent XSS attacks
-app.use(xss());
 
 // 10. Prevent HTTP parameter pollution
 app.use(hpp());
