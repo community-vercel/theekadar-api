@@ -54,14 +54,30 @@ const submitReview = async (req, res) => {
 
 const getReviews = async (req, res) => {
   const { serviceId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
 
   try {
-    const service = await Service.findById(serviceId).select('ratings averageRating');
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const service = await Service.findById(serviceId);
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    res.json(service.ratings);
+    const totalItems = service.ratings.length;
+    const paginatedRatings = service.ratings.slice(skip, skip + limitNum);
+
+    res.json({
+      data: paginatedRatings,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalItems / limitNum),
+        totalItems,
+        limit: limitNum,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

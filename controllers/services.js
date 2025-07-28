@@ -79,7 +79,7 @@ const deleteService = async (req, res) => {
 
 
 const searchServices = async (req, res) => {
-  const { category, lat, lng, maxDistance } = req.query;
+  const { category, lat, lng, maxDistance, page = 1, limit = 10 } = req.query;
 
   try {
     const query = {};
@@ -90,13 +90,30 @@ const searchServices = async (req, res) => {
     if (lat && lng && maxDistance) {
       query.location = {
         $geoWithin: {
-          $centerSphere: [[parseFloat(lng), parseFloat(lat)], parseFloat(maxDistance) / 6378.1], // Convert km to radians
+          $centerSphere: [[parseFloat(lng), parseFloat(lat)], parseFloat(maxDistance) / 6378.1],
         },
       };
     }
 
-    const services = await Service.find(query).populate('workerId', 'name phone');
-    res.json(services);
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const totalItems = await Service.countDocuments(query);
+    const services = await Service.find(query)
+      .populate('workerId', 'name phone')
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({
+      data: services,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalItems / limitNum),
+        totalItems,
+        limit: limitNum,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

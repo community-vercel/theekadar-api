@@ -89,6 +89,14 @@ const updateUserSchema = Joi.object({
     country: Joi.string().allow(''),
   }).optional(),
 });
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
+const resetPasswordSchema = Joi.object({
+  token: Joi.string().required(),
+  password: Joi.string().min(6).required(),
+});
 
 module.exports = {
   validate,
@@ -99,4 +107,6 @@ module.exports = {
   reviewSchema,
   notificationSchema,
   updateUserSchema,
+   forgotPasswordSchema,
+  resetPasswordSchema,
 };

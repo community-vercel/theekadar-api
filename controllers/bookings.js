@@ -63,5 +63,41 @@ const updateBookingStatus = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+const getBookings = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
 
-module.exports = { createBooking, updateBookingStatus };
+  try {
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const query = req.user.role === 'client' 
+      ? { clientId: req.user.id }
+      : req.user.role === 'worker'
+      ? { workerId: req.user.id }
+      : {}; // Admins see all bookings
+
+    const totalItems = await Booking.countDocuments(query);
+    const bookings = await Booking.find(query)
+      .populate('clientId', 'name email')
+      .populate('workerId', 'name email')
+      .populate('serviceId', 'category description')
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({
+      data: bookings,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalItems / limitNum),
+        totalItems,
+        limit: limitNum,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { createBooking, updateBookingStatus, getBookings };
+

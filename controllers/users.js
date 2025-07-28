@@ -68,12 +68,29 @@ const verifyWorker = async (req, res) => {
 };
 
 const getPendingVerifications = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+
   try {
-    const users = await User.find({
-      role: 'worker',
-      'verificationDocuments.status': 'pending',
-    }).select('name email verificationDocuments');
-    res.json(users);
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const query = { role: 'worker', 'verificationDocuments.status': 'pending' };
+    const totalItems = await User.countDocuments(query);
+    const users = await User.find(query)
+      .select('name email verificationDocuments')
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({
+      data: users,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalItems / limitNum),
+        totalItems,
+        limit: limitNum,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

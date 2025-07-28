@@ -52,5 +52,34 @@ const getWorkerProfile = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+const getWorkers = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
 
-module.exports = { createWorkerProfile, getWorkerProfile };
+  try {
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const query = { isVerified: true }; // Only show verified workers
+    const totalItems = await Worker.countDocuments(query);
+    const workers = await Worker.find(query)
+      .populate('user', 'name email phone')
+      .skip(skip)
+      .limit(limitNum);
+
+    res.json({
+      data: workers,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalItems / limitNum),
+        totalItems,
+        limit: limitNum,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { createWorkerProfile, getWorkerProfile, getWorkers };
+
