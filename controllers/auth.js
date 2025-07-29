@@ -9,7 +9,7 @@ const PasswordResetToken = require('../models/PasswordResetToken');
 const { sendEmail } = require('../utils/email'); // New utility for sending emails
 
 const register = async (req, res) => {
-  const { email, password, name, phone, address, role } = req.body;
+  const { email, password, name, phone, address, role, location } = req.body;
 
   try {
     let user = await User.findOne({ email });
@@ -30,16 +30,40 @@ const register = async (req, res) => {
       phone,
       address,
       role,
+      location,
     });
 
     await user.save();
 
-    // Notify admin for worker verification
-    if (role === 'worker') {
-      await sendNotification('admin', `New worker registered: ${name}`, 'general');
+    if (['worker', 'thekedar'].includes(role)) {
+      await sendNotification('admin', `New ${role} registered: ${name}`, 'general');
     }
 
     res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const uploadVerificationDocument = async (req, res) => {
+  const { type } = req.body;
+  const file = req.files?.document;
+
+  try {
+    if (!file) {
+      return res.status(400).json({ error: 'Document file is required' });
+    }
+    if (!['worker', 'thekedar'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only workers and thekedars can upload verification documents' });
+    }
+
+    const url = await uploadToVercelBlob(file.data, `${req.user.id}-${type}-${Date.now()}`);
+    const user = await User.findById(req.user.id);
+    user.verificationDocuments.push({ type, url, status: 'pending' });
+    await user.save();
+
+    await sendNotification('admin', `New verification document uploaded by ${user.name} (${req.user.role})`, 'general');
+    res.json({ message: 'Document uploaded successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -71,26 +95,6 @@ const login = async (req, res) => {
   }
 };
 
-const uploadVerificationDocument = async (req, res) => {
-  const { type } = req.body;
-  const file = req.files?.document;
-
-  try {
-    if (!file) {
-      return res.status(400).json({ error: 'Document file is required' });
-    }
-
-    const url = await uploadToVercelBlob(file.data, `${req.user.id}-${type}-${Date.now()}`);
-    const user = await User.findById(req.user.id);
-    user.verificationDocuments.push({ type, url, status: 'pending' });
-    await user.save();
-
-    await sendNotification('admin', `New verification document uploaded by ${user.name}`, 'general');
-    res.json({ message: 'Document uploaded successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
 const forgotPassword = async (req, res) => {
   const { email } = req.body;

@@ -4,16 +4,35 @@ const Worker = require('../models/Worker');
 const { sendNotification } = require('../utils/pusher');
 
 const createService = async (req, res) => {
-  const { category, description, hourlyRate, availability, location } = req.body;
+  const { category, description, hourlyRate, availability, location, workerId } = req.body;
 
   try {
-    const worker = await Worker.findOne({ user: req.user.id });
+    let userId = req.user.id;
+    let roleCheck = req.user.role === 'worker';
+    let worker;
+
+    if (req.user.role === 'thekedar') {
+      const thekedar = await Thekedar.findOne({ user: req.user.id });
+      if (!thekedar) {
+        return res.status(404).json({ error: 'Thekedar profile not found' });
+      }
+      if (!workerId || !thekedar.workers.includes(workerId)) {
+        return res.status(403).json({ error: 'Worker not in your team' });
+      }
+      userId = workerId;
+      worker = await Worker.findById(workerId);
+      roleCheck = true;
+    } else {
+      worker = await Worker.findOne({ user: req.user.id });
+    }
+
     if (!worker) {
       return res.status(403).json({ error: 'Worker profile not found' });
     }
 
     const service = new Service({
-      workerId: req.user.id,
+      workerId: userId,
+      thekedarId: req.user.role === 'thekedar' ? req.user.id : null,
       category,
       description,
       hourlyRate,
@@ -22,7 +41,10 @@ const createService = async (req, res) => {
     });
 
     await service.save();
-    await sendNotification(req.user.id, `New service (${category}) created`, 'general');
+    await sendNotification(userId, `New service (${category}) created`, 'general');
+    if (req.user.role === 'thekedar') {
+      await sendNotification(req.user.id, `Service (${category}) created for worker`, 'general');
+    }
     res.status(201).json(service);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -38,7 +60,9 @@ const updateService = async (req, res) => {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    if (service.workerId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (service.workerId.toString() !== req.user.id && 
+        service.thekedarId?.toString() !== req.user.id && 
+        req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -65,7 +89,9 @@ const deleteService = async (req, res) => {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    if (service.workerId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (service.workerId.toString() !== req.user.id && 
+        service.thekedarId?.toString() !== req.user.id && 
+        req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied' });
     }
 

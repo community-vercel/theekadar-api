@@ -5,9 +5,9 @@ const { createService, updateService, deleteService, searchServices } = require(
 const { validate, serviceSchema } = require('../middleware/validation');
 const auth = require('../middleware/auth');
 
-router.post('/', auth(['worker']), validate(serviceSchema), createService);
-router.put('/', auth(['worker', 'admin']), validate(serviceSchema), updateService);
-router.delete('/:serviceId', auth(['worker', 'admin']), deleteService);
+router.post('/', auth(['worker', 'thekedar']), validate(serviceSchema), createService);
+router.put('/', auth(['worker', 'thekedar', 'admin']), validate(serviceSchema), updateService);
+router.delete('/:serviceId', auth(['worker', 'thekedar', 'admin']), deleteService);
 router.get('/search', searchServices); // Public route for searching services
 
 module.exports = router;

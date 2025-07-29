@@ -42,6 +42,7 @@ const workerSchema = Joi.object({
 });
 
 const serviceSchema = Joi.object({
+  workerId: Joi.string().optional(), // Required for thekedars
   category: Joi.string()
     .valid('plumber', 'driver', 'consultant', 'electrician', 'other')
     .required(),
@@ -97,7 +98,16 @@ const resetPasswordSchema = Joi.object({
   token: Joi.string().required(),
   password: Joi.string().min(6).required(),
 });
-
+const thekedarSchema = Joi.object({
+  companyName: Joi.string().required(),
+  experience: Joi.number().min(0).required(),
+  certifications: Joi.array().items(Joi.string()).optional(),
+  profileImage: Joi.object({
+    data: Joi.string().required(),
+    name: Joi.string().required(),
+    type: Joi.string().valid('image/jpeg', 'image/png').required(),
+  }).optional(),
+});
 module.exports = {
   validate,
   userSchema,
@@ -109,4 +119,5 @@ module.exports = {
   updateUserSchema,
    forgotPasswordSchema,
   resetPasswordSchema,
+  thekedarSchema,
 };

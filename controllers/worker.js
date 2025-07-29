@@ -12,7 +12,6 @@ const createWorkerProfile = async (req, res) => {
     if (user.role !== 'worker') {
       return res.status(403).json({ error: 'Only workers can create profiles' });
     }
-
     if (!user.isVerified) {
       return res.status(403).json({ error: 'User verification pending' });
     }
@@ -30,7 +29,7 @@ const createWorkerProfile = async (req, res) => {
       skills,
       experience,
       hourlyRate,
-      location,
+      location: location || user.location, // Use user.location if provided
       profileImage: profileImageUrl,
     });
 

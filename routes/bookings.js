@@ -6,7 +6,8 @@ const { validate, bookingSchema } = require('../middleware/validation');
 const auth = require('../middleware/auth');
 
 router.post('/', auth(['client']), validate(bookingSchema), createBooking);
-router.put('/status', auth(['worker', 'admin']), updateBookingStatus);
+router.put('/status', auth(['worker', 'thekedar', 'admin']), updateBookingStatus);
+
 router.get('/', auth(['client', 'worker', 'admin']), getBookings);
 
 
