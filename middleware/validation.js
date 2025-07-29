@@ -26,19 +26,57 @@ const userSchema = Joi.object({
     zip: Joi.string().allow(''),
     country: Joi.string().allow(''),
   }).optional(),
-  role: Joi.string().valid('client', 'worker', 'admin').default('client'),
+  role: Joi.string().valid('client', 'worker', 'admin', 'thekedar').default('client'),
+  location: Joi.object({
+    type: Joi.string().valid('Point').default('Point'),
+    coordinates: Joi.array().items(Joi.number()).length(2).optional(),
+  }).optional(),
+});
+
+const updateUserSchema = Joi.object({
+  name: Joi.string().optional(),
+  phone: Joi.string().pattern(/^[0-9]{10,15}$/).optional(),
+  address: Joi.object({
+    street: Joi.string().allow(''),
+    city: Joi.string().allow(''),
+    state: Joi.string().allow(''),
+    zip: Joi.string().allow(''),
+    country: Joi.string().allow(''),
+  }).optional(),
+  location: Joi.object({
+    type: Joi.string().valid('Point').default('Point'),
+    coordinates: Joi.array().items(Joi.number()).length(2).optional(),
+  }).optional(),
 });
 
 const workerSchema = Joi.object({
   skills: Joi.array().items(Joi.string()).min(1).required(),
   experience: Joi.number().min(0).required(),
   hourlyRate: Joi.number().min(0).required(),
-  location: Joi.string().required(),
+  location: Joi.object({
+    type: Joi.string().valid('Point').default('Point'),
+    coordinates: Joi.array().items(Joi.number()).length(2).optional(),
+  }).optional(),
   profileImage: Joi.object({
-    data: Joi.string().required(),  // base64 string
-    name: Joi.string().required(),  // filename
-    type: Joi.string().valid('image/jpeg', 'image/png').required(),  // mime type
-  })
+    data: Joi.string().required(),
+    name: Joi.string().required(),
+    type: Joi.string().valid('image/jpeg', 'image/png').required(),
+  }).optional(),
+});
+
+const thekedarSchema = Joi.object({
+  companyName: Joi.string().required(),
+  experience: Joi.number().min(0).required(),
+  certifications: Joi.array().items(Joi.string()).optional(),
+  location: Joi.object({
+    type: Joi.string().valid('Point').default('Point'),
+    coordinates: Joi.array().items(Joi.number()).length(2).optional(),
+  }).optional(),
+  profileImage: Joi.object({
+    data: Joi.string().required(),
+    name: Joi.string().required(),
+    type: Joi.string().valid('image/jpeg', 'image/png').required(),
+  }).optional(),
 });
 
 const serviceSchema = Joi.object({
@@ -79,17 +117,6 @@ const notificationSchema = Joi.object({
   type: Joi.string().valid('booking', 'status', 'general').required(),
 });
 
-const updateUserSchema = Joi.object({
-  name: Joi.string().optional(),
-  phone: Joi.string().pattern(/^[0-9]{10,15}$/).required(),
-  address: Joi.object({
-    street: Joi.string().allow(''),
-    city: Joi.string().allow(''),
-    state: Joi.string().allow(''),
-    zip: Joi.string().allow(''),
-    country: Joi.string().allow(''),
-  }).optional(),
-});
 const forgotPasswordSchema = Joi.object({
   email: Joi.string().email().required(),
 });
@@ -98,16 +125,7 @@ const resetPasswordSchema = Joi.object({
   token: Joi.string().required(),
   password: Joi.string().min(6).required(),
 });
-const thekedarSchema = Joi.object({
-  companyName: Joi.string().required(),
-  experience: Joi.number().min(0).required(),
-  certifications: Joi.array().items(Joi.string()).optional(),
-  profileImage: Joi.object({
-    data: Joi.string().required(),
-    name: Joi.string().required(),
-    type: Joi.string().valid('image/jpeg', 'image/png').required(),
-  }).optional(),
-});
+
 module.exports = {
   validate,
   userSchema,
