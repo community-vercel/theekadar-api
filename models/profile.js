@@ -1,3 +1,4 @@
+// models/Profile.js
 const mongoose = require('mongoose');
 
 const profileSchema = new mongoose.Schema({
@@ -5,7 +6,11 @@ const profileSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: { type: String },
   address: { type: String },
-  logo: { type: String }, // URL from Vercel Blob
+  location: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: { type: [Number], required: false }, // [longitude, latitude]
+  },
+  logo: { type: String },
   skills: [{ type: String }], // For workers
   features: [{ type: String }], // For thekadar, small/large consultants
   verificationStatus: { 
@@ -13,6 +18,10 @@ const profileSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'], 
     default: 'pending' 
   },
+  callCount: { type: Number, default: 0 }, // Track call button clicks
 });
+
+// Add 2dsphere index for geospatial queries
+profileSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Profile', profileSchema);
