@@ -1,156 +1,48 @@
-// E:\theekadar-api\controllers\auth.js
+// controllers/authController.js
+const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { uploadToVercelBlob } = require('../utils/blob');
-const { sendNotification } = require('../utils/pusher');
-const crypto = require('crypto');
-const PasswordResetToken = require('../models/PasswordResetToken');
-const { sendEmail } = require('../utils/email'); // New utility for sending emails
 
-const register = async (req, res) => {
-  const { email, password, name, phone, address, role, location } = req.body;
+const registerSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  role: Joi.string().valid('client', 'worker', 'thekadar', 'small_consultant', 'large_consultant').required(),
+});
 
-  try {
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ error: 'Email already exists' });
-    }
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+});
 
-    user = await User.findOne({ phone });
-    if (user) {
-      return res.status(400).json({ error: 'Phone number already exists' });
-    }
+exports.register = async (req, res) => {
+  const { error } = registerSchema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    user = new User({
-      email,
-      password: hashedPassword,
-      name,
-      phone,
-      address,
-      role,
-      location,
-    });
+  const { email, password, role } = req.body;
 
-    await user.save();
+  const existingUser = await User.findOne({ email });
+  if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
-    if (['worker', 'thekedar'].includes(role)) {
-      await sendNotification('admin', `New ${role} registered: ${name}`, 'general');
-    }
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = new User({ email, password: hashedPassword, role });
+  await user.save();
 
-    res.status(201).json({ message: 'User registered successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  res.status(201).json({ token, userId: user._id });
 };
 
-const uploadVerificationDocument = async (req, res) => {
-  const { type } = req.body;
-  const file = req.files?.document;
+exports.login = async (req, res) => {
+  const { error } = loginSchema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
 
-  try {
-    if (!file) {
-      return res.status(400).json({ error: 'Document file is required' });
-    }
-    if (!['worker', 'thekedar'].includes(req.user.role)) {
-      return res.status(403).json({ error: 'Only workers and thekedars can upload verification documents' });
-    }
-
-    const url = await uploadToVercelBlob(file.data, `${req.user.id}-${type}-${Date.now()}`);
-    const user = await User.findById(req.user.id);
-    user.verificationDocuments.push({ type, url, status: 'pending' });
-    await user.save();
-
-    await sendNotification('admin', `New verification document uploaded by ${user.name} (${req.user.role})`, 'general');
-    res.json({ message: 'Document uploaded successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const login = async (req, res) => {
   const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid credentials' });
-    }
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  res.json({ token, userId: user._id });
 };
-
-
-const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
-  try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Generate a random reset token
-    const token = crypto.randomBytes(32).toString('hex');
-    await PasswordResetToken.create({
-      userId: user._id,
-      token,
-    });
-
-    // Send reset email
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-    await sendEmail({
-      to: user.email,
-      subject: 'Password Reset Request',
-      text: `Click here to reset your password: ${resetUrl}\nThis link expires in 1 hour.`,
-    });
-
-    res.json({ message: 'Password reset email sent' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-const resetPassword = async (req, res) => {
-  const { token, password } = req.body;
-
-  try {
-    const resetToken = await PasswordResetToken.findOne({ token });
-    if (!resetToken) {
-      return res.status(400).json({ error: 'Invalid or expired token' });
-    }
-
-    const user = await User.findById(resetToken.userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Update password
-    user.password = await bcrypt.hash(password, 10);
-    await user.save();
-
-    // Delete the used token
-    await PasswordResetToken.deleteOne({ _id: resetToken._id });
-
-    res.json({ message: 'Password reset successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-module.exports = { register, login, uploadVerificationDocument, forgotPassword, resetPassword };

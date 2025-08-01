@@ -1,7 +1,7 @@
 // E:\theekadar-api\controllers\worker.js
 const Worker = require('../models/Worker');
 const User = require('../models/User');
-const { uploadToVercelBlob } = require('../utils/blob');
+const { uploadToVercelBlob } = require('../utils/vercelBlob');
 
 const createWorkerProfile = async (req, res) => {
   const { skills, experience, hourlyRate, location } = req.body;

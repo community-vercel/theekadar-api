@@ -1,6 +1,7 @@
 // E:\theekadar-api\controllers\services.js
 const Service = require('../models/Service');
 const Worker = require('../models/Worker');
+const Thekedar = require('../models/Thekedar');
 const { sendNotification } = require('../utils/pusher');
 
 const createService = async (req, res) => {
@@ -8,31 +9,43 @@ const createService = async (req, res) => {
 
   try {
     let userId = req.user.id;
-    let roleCheck = req.user.role === 'worker';
+    let thekedarId = null;
     let worker;
 
     if (req.user.role === 'thekedar') {
-      const thekedar = await Thekedar.findOne({ user: req.user.id });
+      const thekedar = await Thekedar.findOne({ user: req.user.id }).populate('user');
       if (!thekedar) {
         return res.status(404).json({ error: 'Thekedar profile not found' });
       }
-      if (!workerId || !thekedar.workers.includes(workerId)) {
-        return res.status(403).json({ error: 'Worker not in your team' });
-      }
-      userId = workerId;
-      worker = await Worker.findById(workerId);
-      roleCheck = true;
-    } else {
-      worker = await Worker.findOne({ user: req.user.id });
-    }
 
-    if (!worker) {
-      return res.status(403).json({ error: 'Worker profile not found' });
+      if (workerId) {
+        // Thekedar is assigning the service to a worker
+        if (!thekedar.workers.includes(workerId)) {
+          return res.status(403).json({ error: 'Worker not in your team' });
+        }
+        worker = await Worker.findById(workerId);
+        if (!worker) {
+          return res.status(404).json({ error: 'Worker profile not found' });
+        }
+        userId = worker.user; // Set worker's user ID as workerId
+        thekedarId = req.user.id;
+      } else {
+        // Thekedar is creating the service for themselves
+        userId = req.user.id;
+        thekedarId = req.user.id;
+      }
+    } else if (req.user.role === 'worker') {
+      worker = await Worker.findOne({ user: req.user.id });
+      if (!worker) {
+        return res.status(403).json({ error: 'Worker profile not found' });
+      }
+    } else {
+      return res.status(403).json({ error: 'Only workers and thekedars can create services' });
     }
 
     const service = new Service({
       workerId: userId,
-      thekedarId: req.user.role === 'thekedar' ? req.user.id : null,
+      thekedarId,
       category,
       description,
       hourlyRate,
@@ -41,10 +54,13 @@ const createService = async (req, res) => {
     });
 
     await service.save();
+
+    // Notify the worker (if assigned) and thekedar
     await sendNotification(userId, `New service (${category}) created`, 'general');
-    if (req.user.role === 'thekedar') {
-      await sendNotification(req.user.id, `Service (${category}) created for worker`, 'general');
+    if (thekedarId && thekedarId !== userId) {
+      await sendNotification(thekedarId, `Service (${category}) created for worker`, 'general');
     }
+
     res.status(201).json(service);
   } catch (error) {
     res.status(500).json({ error: error.message });

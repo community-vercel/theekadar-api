@@ -80,24 +80,27 @@ const thekedarSchema = Joi.object({
 });
 
 const serviceSchema = Joi.object({
-  workerId: Joi.string().optional(), // Required for thekedars
+  workerId: Joi.string().optional(), // Optional for thekedars
   category: Joi.string()
     .valid('plumber', 'driver', 'consultant', 'electrician', 'other')
     .required(),
-  description: Joi.string().allow(''),
+  description: Joi.string().required(),
   hourlyRate: Joi.number().min(0).required(),
   availability: Joi.array().items(
     Joi.object({
-      day: Joi.string().required(),
+      day: Joi.string()
+        .valid('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+        .required(),
       startTime: Joi.string().required(),
       endTime: Joi.string().required(),
     })
-  ),
+  ).required(),
   location: Joi.object({
     type: Joi.string().valid('Point').default('Point'),
     coordinates: Joi.array().items(Joi.number()).length(2).required(),
   }).required(),
 });
+
 
 const bookingSchema = Joi.object({
   serviceId: Joi.string().required(),
@@ -126,9 +129,28 @@ const resetPasswordSchema = Joi.object({
   password: Joi.string().min(6).required(),
 });
 
+// Validation Schema for Post Creation
+const postSchema = Joi.object({
+  title: Joi.string().required(),
+  description: Joi.string().required(),
+  category: Joi.string().valid('job_request', 'service_offering', 'consulting', 'contracting').required(),
+  hourlyRate: Joi.number().optional(), // Validated in Mongoose schema for workers
+  availability: Joi.boolean().default(true),
+  serviceType: Joi.string().valid('general', 'specialized', 'emergency', 'long_term').optional(),
+  projectScale: Joi.string().valid('small', 'medium', 'large').optional(),
+  certifications: Joi.array().items(Joi.string()).optional(),
+  images: Joi.array().items(Joi.string()).optional(),
+});
+const registerSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  role: Joi.string().valid('client', 'worker', 'thekadar', 'small_consultant', 'large_consultant').required(),
+});
 module.exports = {
   validate,
   userSchema,
+  postSchema,
+  registerSchema,
   workerSchema,
   serviceSchema,
   bookingSchema,

@@ -9,7 +9,12 @@ const hpp = require('hpp');
 const morgan = require('morgan');
 const compression = require('compression');
 const csurf = require('csurf');
-const authroutes = require('./routes/auth');
+const authRoutes = require('./routes/auth');
+const verificationRoutes = require('./routes/verificationRoutes');
+const profileRoutes = require('./routes/profileRoutes');
+
+const postRoutes = require('./routes/postRoutes');
+
 connectDB();
 
 const app = express();
@@ -65,14 +70,11 @@ app.use(compression());
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
+app.use('/api/auth', authRoutes);
+app.use('/api/verification', verificationRoutes);
+app.use('/api/profile', profileRoutes);
 
-app.use('/api/auth',authroutes);
-app.use('/api/workers', require('./routes/worker'));
-app.use('/api/bookings', require('./routes/bookings'));
-app.use('/api/services', require('./routes/services'));
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/reviews', require('./routes/reviews'));
-app.use('/api/users', require('./routes/users'));
+app.use('/api/posts', postRoutes);
 
 // Handle 404 for unknown routes
 app.use((req, res, next) => {
