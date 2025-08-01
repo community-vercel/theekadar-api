@@ -4,12 +4,16 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// Validation schema for registration
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
-  role: Joi.string().valid('client', 'worker', 'thekadar', 'small_consultant', 'large_consultant').required(),
+  name: Joi.string().required(), // New field: required
+  phone: Joi.string().optional(), // New field: optional
+  role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant').required(),
 });
 
+// Validation schema for login
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required(),
@@ -19,13 +23,13 @@ exports.register = async (req, res) => {
   const { error } = registerSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
-  const { email, password, role } = req.body;
+  const { email, password, name, phone, role } = req.body;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const user = new User({ email, password: hashedPassword, role });
+  const user = new User({ email, password: hashedPassword, name, phone, role });
   await user.save();
 
   const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
