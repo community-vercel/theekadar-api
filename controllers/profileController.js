@@ -11,10 +11,8 @@ const profileSchema = Joi.object({
   address: Joi.string().optional(),
   skills: Joi.array().items(Joi.string()).optional(),
   features: Joi.array().items(Joi.string()).optional(),
-  location: Joi.object({
-    type: Joi.string().valid('Point').default('Point'),
-    coordinates: Joi.array().items(Joi.number()).length(2).optional() // [longitude, latitude]
-  }).optional(),
+ city: Joi.string().required(),
+  town: Joi.string().required(),
 });
 
 // Validation schema for near query
@@ -50,11 +48,12 @@ exports.createProfile = async (req, res) => {
     userId: req.user.userId,
     name: req.body.name,
     phone: req.body.phone,
+    city: req.body.city,
+    town: req.body.town,
     address: req.body.address,
     logo: logoUrl,
     skills: skills || [],
     features: features || [],
-    location: location || { type: 'Point', coordinates: [] },
   });
 
   await profile.save();
@@ -81,8 +80,8 @@ exports.updateProfile = async (req, res) => {
   profile.address = req.body.address || profile.address;
   profile.skills = req.body.skills || profile.skills;
   profile.features = req.body.features || profile.features;
-  profile.location = req.body.location || profile.location;
-
+profile.city = req.body.city || profile.city;
+  profile.town = req.body.town || profile.town;
   if (req.file) profile.logo = await uploadFile(req.file);
 
   await profile.save();
@@ -120,24 +119,19 @@ exports.findProfilesNear = async (req, res) => {
   const { error } = nearSchema.validate(req.query);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
-  const { lng, lat, radius, role } = req.query;
-
-  // Convert radius from kilometers to meters (MongoDB uses meters for geospatial queries)
-  const radiusInMeters = parseFloat(radius) * 1000;
+  const { city, town, address, role } = req.query;
 
   // Build query
   let query = {
-    location: {
-      $nearSphere: {
-        $geometry: {
-          type: 'Point',
-          coordinates: [parseFloat(lng), parseFloat(lat)],
-        },
-        $maxDistance: radiusInMeters,
-      },
-    },
+    city: { $regex: `^${city}$`, $options: 'i' }, // Case-insensitive exact match for city
+    town: { $regex: `^${town}$`, $options: 'i' }, // Case-insensitive exact match for town
     verificationStatus: 'approved', // Only return verified profiles
   };
+
+  // Add address filter if provided (partial match)
+  if (address) {
+    query.address = { $regex: address, $options: 'i' }; // Case-insensitive partial match
+  }
 
   // Add role filter if provided
   if (role) {
@@ -145,16 +139,13 @@ exports.findProfilesNear = async (req, res) => {
   }
 
   try {
-    // Find profiles, populate user role, and exclude empty coordinates
-    const profiles = await Profile.find({
-      ...query,
-      'location.coordinates': { $ne: [] }, // Exclude profiles with empty coordinates
-    })
+    // Find profiles, populate user role
+    const profiles = await Profile.find(query)
       .populate('userId', 'role')
-      .select('userId name phone address location skills features logo callCount');
+      .select('userId name phone city town address skills features logo callCount');
 
     res.json(profiles);
   } catch (err) {
-    res.status(500).json({ message: 'Error performing geospatial query', error: err.message });
+    res.status(500).json({ message: 'Error performing query', error: err.message });
   }
 };

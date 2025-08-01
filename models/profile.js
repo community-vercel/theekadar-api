@@ -5,11 +5,10 @@ const profileSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: false },
   phone: { type: String,required: false },
+  city: { type: String, required: true },
+  town: { type: String, required: true },
   address: { type: String },
-  location: {
-    type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], required: false }, // [longitude, latitude]
-  },
+ 
   logo: { type: String },
   skills: [{ type: String }], // For workers
   features: [{ type: String }], // For thekadar, small/large consultants
@@ -22,6 +21,5 @@ const profileSchema = new mongoose.Schema({
 });
 
 // Add 2dsphere index for geospatial queries
-profileSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Profile', profileSchema);
