@@ -83,7 +83,7 @@ exports.updateProfile = async (req, res) => {
   profile.skills = req.body.skills || profile.skills;
   profile.features = req.body.features || profile.features;
   profile.experiance = req.body.experiance || profile.experiance;
-profile.city = req.body.city || profile.city;
+  profile.city = req.body.city || profile.city;
   profile.town = req.body.town || profile.town;
   if (req.file) profile.logo = await uploadFile(req.file);
 
