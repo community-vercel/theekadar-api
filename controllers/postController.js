@@ -15,7 +15,7 @@ const postSchema = Joi.object({
   certifications: Joi.array().items(Joi.string()).optional(),
   projectScale: Joi.string().valid('small', 'medium', 'large').optional(),
   images: Joi.array().items(Joi.string()).optional(),
-  
+  certifications: Joi.array().items(Joi.string()).optional(),
 });
 
 exports.createPost = async (req, res) => {
