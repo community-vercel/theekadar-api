@@ -1,9 +1,10 @@
 const express = require('express');
 const multer = require('multer');
 const { put, del } = require('@vercel/blob');
-const Verification = require('./models/Verification'); // Your schema file
-const User = require('./models/User'); // Assuming you have a User model
-const authMiddleware = require('./middleware/auth'); // Your auth middleware
+const Verification = require('../models/Verification'); // Your schema file
+const User = require('../models/User'); // Assuming you have a User model
+const { authMiddleware } = require('../middleware/auth');
+
 
 const router = express.Router();
 
@@ -12,9 +13,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 1, // Only 1 file
-    fields: 10, // Limit number of fields
-    fieldSize: 1024 * 1024, // 1MB field size limit
   },
   fileFilter: (req, file, cb) => {
     // Accept only image files
@@ -26,31 +24,11 @@ const upload = multer({
   },
 });
 
-// Wrapper to handle upload errors gracefully
-const handleUpload = (req, res, next) => {
-  upload.single('document')(req, res, (err) => {
-    if (err) {
-      console.error('Upload middleware error:', err);
-      
-      if (err.message === 'Unexpected end of form') {
-        return res.status(400).json({
-          error: 'Invalid form data. Please ensure the file is properly attached.',
-          details: 'The form data appears to be incomplete or corrupted.'
-        });
-      }
-      
-      // Pass other errors to the error handler
-      return next(err);
-    }
-    next();
-  });
-};
-
 // POST /api/verification/submit - Submit document for verification
-router.post('/submit', authMiddleware, handleUpload, async (req, res) => {
+router.post('/submit', authMiddleware, upload.single('document'), async (req, res) => {
   try {
     const { documentType } = req.body;
-    const userId = req.user.id; // From authMiddleware middleware
+    const userId = req.user.id; // From auth middleware
 
     // Validate required fields
     if (!documentType || !['id', 'passport', 'license'].includes(documentType)) {
@@ -147,14 +125,9 @@ router.get('/status', authMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching verification status:', {
-      message: error.message,
-      stack: error.stack,
-      userId: req.user?.id
-    });
+    console.error('Error fetching verification status:', error);
     res.status(500).json({
-      error: 'Failed to fetch verification status',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Failed to fetch verification status'
     });
   }
 });
@@ -413,11 +386,6 @@ router.use((error, req, res, next) => {
         error: 'File too large. Maximum size is 5MB.'
       });
     }
-    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({
-        error: 'Unexpected file field. Use "document" as the field name.'
-      });
-    }
     return res.status(400).json({
       error: `Upload error: ${error.message}`
     });
@@ -426,16 +394,6 @@ router.use((error, req, res, next) => {
   if (error.message === 'Only image files are allowed') {
     return res.status(400).json({
       error: 'Only image files are allowed'
-    });
-  }
-
-  // Handle busboy/multipart errors
-  if (error.message === 'Unexpected end of form' || 
-      error.message.includes('Multipart') ||
-      error.message.includes('busboy')) {
-    return res.status(400).json({
-      error: 'Invalid or corrupted form data. Please try uploading again.',
-      details: 'Make sure you are sending the request as multipart/form-data'
     });
   }
 
