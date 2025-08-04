@@ -12,10 +12,12 @@ const postSchema = Joi.object({
   availability: Joi.boolean().default(true),
   serviceType: Joi.string().valid('general', 'specialized', 'emergency', 'long_term').optional(),
   projectScale: Joi.string().valid('small', 'medium', 'large').optional(),
-  certifications: Joi.array().items(Joi.string()).optional(),
+certifications: Joi.alternatives().try(
+  Joi.array().items(Joi.string()),
+  Joi.string()
+).optional(),
   projectScale: Joi.string().valid('small', 'medium', 'large').optional(),
   images: Joi.array().items(Joi.string()).optional(),
-  certifications: Joi.array().items(Joi.string()).optional(),
 });
 
 exports.createPost = async (req, res) => {
