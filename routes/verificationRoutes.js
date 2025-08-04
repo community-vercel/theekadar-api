@@ -28,7 +28,7 @@ const upload = multer({
 router.post('/submit', authMiddleware, upload.single('document'), async (req, res) => {
   try {
     const { documentType } = req.body;
-    const userId = req.user.id; // From authMiddleware middleware
+    const userId = req.user.id; // From auth middleware
 
     // Validate required fields
     if (!documentType || !['id', 'passport', 'license'].includes(documentType)) {
@@ -84,9 +84,24 @@ router.post('/submit', authMiddleware, upload.single('document'), async (req, re
     });
 
   } catch (error) {
-    console.error('Error submitting verification:', error);
+    console.error('Error submitting verification:', {
+      message: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+      documentType: req.body?.documentType
+    });
+    
+    // Handle specific Vercel Blob errors
+    if (error.message?.includes('blob') || error.message?.includes('upload')) {
+      return res.status(500).json({
+        error: 'Failed to upload document. Please try again.',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+    
     res.status(500).json({
-      error: 'Failed to submit document for verification'
+      error: 'Failed to submit document for verification',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -363,12 +378,17 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
 // Error handling middleware for multer
 router.use((error, req, res, next) => {
+  console.error('Route error:', error);
+  
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         error: 'File too large. Maximum size is 5MB.'
       });
     }
+    return res.status(400).json({
+      error: `Upload error: ${error.message}`
+    });
   }
   
   if (error.message === 'Only image files are allowed') {
@@ -377,8 +397,33 @@ router.use((error, req, res, next) => {
     });
   }
 
+  // More specific error handling
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation error',
+      details: error.message
+    });
+  }
+
+  if (error.name === 'CastError') {
+    return res.status(400).json({
+      error: 'Invalid ID format'
+    });
+  }
+
+  // Log the full error for debugging
+  console.error('Unhandled error:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack
+  });
+
   res.status(500).json({
-    error: 'An error occurred while processing your request'
+    error: 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { 
+      details: error.message,
+      stack: error.stack 
+    })
   });
 });
 
