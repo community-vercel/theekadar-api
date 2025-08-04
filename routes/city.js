@@ -36,7 +36,7 @@ router.get('/getcities', async (req, res) => {
 });
 
 // NEW GET endpoint to fetch towns of a specific city by name
-router.get('/cities/:cityName/towns', async (req, res) => {
+router.get('/:cityName/towns', async (req, res) => {
     try {
         const cityName = req.params.cityName;
         
