@@ -24,8 +24,17 @@ exports.createPost = async (req, res) => {
 
   const user = await User.findById(req.user.userId);
   if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
+let files = [];
 
-  const imageUrls = await Promise.all(req.files.map(file => uploadFile(file)));
+if (req.files) {
+  if (Array.isArray(req.files)) {
+    files = req.files;
+  } else if (req.files.images && Array.isArray(req.files.images)) {
+    files = req.files.images; // when using upload.fields
+  }
+}
+
+const imageUrls = await Promise.all(files.map(file => uploadFile(file)));
   const post = new Post({
     userId: req.user.userId,
     title: req.body.title,
