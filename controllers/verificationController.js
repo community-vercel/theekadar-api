@@ -2,26 +2,52 @@
 const Verification = require('../models/Verification');
 const { uploadFile } = require('../utils/vercelBlob');
 
-exports.submitVerification = async (req, res) => {
+const { put } = require("@vercel/blob");
+
+exports.uploadVerification = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Document required' });
-    }
-    if (!req.body.documentType) {
-      return res.status(400).json({ message: 'Document type required' });
+    const { userId, documentType } = req.body;
+
+    // Validate fields
+    if (!userId || !documentType) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const documentUrl = await uploadFile(req.file);
-    const verification = new Verification({
-      userId: req.user.userId,
-      documentType: req.body.documentType,
-      documentUrl,
+    if (!["id", "passport", "license"].includes(documentType)) {
+      return res.status(400).json({ message: "Invalid document type" });
+    }
+
+    // Check file
+    if (!req.files || !req.files.document) {
+      return res.status(400).json({ message: "No document uploaded" });
+    }
+
+    const file = req.files.document;
+    const fileName = `verification/${Date.now()}-${file.name}`;
+
+    // Upload to Vercel Blob
+    const { url } = await put(fileName, file.data, {
+      access: "public",
+      token: process.env.VERCEL_BLOB_WRITE_ONLY_TOKEN,
     });
+
+    // Save to MongoDB
+    const verification = new Verification({
+      userId,
+      documentType,
+      documentUrl: url,
+      status: "pending",
+    });
+
     await verification.save();
 
-    res.status(201).json({ message: 'Document submitted for verification' });
+    res.status(201).json({
+      success: true,
+      message: "Document uploaded successfully",
+      data: verification,
+    });
   } catch (error) {
-    console.error('Error submitting verification:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Verification upload error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
