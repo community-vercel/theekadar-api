@@ -34,8 +34,10 @@ if (req.files) {
   }
 }
 
-const imageUrls = await Promise.all(files.map(file => uploadFile(file)));
-  const post = new Post({
+const imageUrls = req.files && Array.isArray(req.files)
+  ? await Promise.all(req.files.map(file => uploadFile(file)))
+  : [];
+    const post = new Post({
     userId: req.user.userId,
     title: req.body.title,
     description: req.body.description,
