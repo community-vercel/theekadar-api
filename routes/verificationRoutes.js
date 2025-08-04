@@ -5,5 +5,6 @@ const verificationController = require('../controllers/verificationController');
 const { authMiddleware } = require('../middleware/auth');
 
 router.post('/submit', authMiddleware, verificationController.uploadVerification);
+router.get('/status',authMiddleware, verificationController.checkVerificationStatus);
 
 module.exports = router;
