@@ -8,7 +8,7 @@ const profileSchema = new mongoose.Schema({
   city: { type: String, required: true },
   town: { type: String, required: true },
   address: { type: String },
- 
+ experiance: { type: Number, required: true, min: 0 },
   logo: { type: String },
   skills: [{ type: String }], // For workers
   features: [{ type: String }], // For thekadar, small/large consultants

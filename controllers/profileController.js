@@ -13,6 +13,7 @@ const profileSchema = Joi.object({
   features: Joi.array().items(Joi.string()).optional(),
  city: Joi.string().required(),
   town: Joi.string().required(),
+  experiance: Joi.number().required().min(0), // New field: required
 });
 
 // Validation schema for near query
@@ -51,6 +52,7 @@ exports.createProfile = async (req, res) => {
     city: req.body.city,
     town: req.body.town,
     address: req.body.address,
+    experiance: req.body.experiance,
     logo: logoUrl,
     skills: skills || [],
     features: features || [],
@@ -80,6 +82,7 @@ exports.updateProfile = async (req, res) => {
   profile.address = req.body.address || profile.address;
   profile.skills = req.body.skills || profile.skills;
   profile.features = req.body.features || profile.features;
+  profile.experiance = req.body.experiance || profile.experiance;
 profile.city = req.body.city || profile.city;
   profile.town = req.body.town || profile.town;
   if (req.file) profile.logo = await uploadFile(req.file);
