@@ -7,7 +7,7 @@ const { uploadFile } = require('../utils/vercelBlob');
 const postSchema = Joi.object({
   title: Joi.string().required(),
   description: Joi.string().required(),
-  category: Joi.string().valid('job_request', 'service_offering', 'consulting', 'contracting').required(),
+  category: Joi.string().required(),
   hourlyRate: Joi.number().optional(),
   availability: Joi.boolean().default(true),
   serviceType: Joi.string().valid('general', 'specialized', 'emergency', 'long_term').optional(),
