@@ -5,11 +5,11 @@ const postSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String, required: true },
   description: { type: String, required: true },
-  category: { 
-    type: String, 
-    required: true, 
-    enum: ['job_request', 'service_offering', 'consulting', 'contracting']
-  },
+  category: {
+  type: String,
+  required: true,
+  // enum removed to allow any string
+},
   images: [{ type: String }],
   hourlyRate: { 
     type: Number, 
