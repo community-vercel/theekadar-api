@@ -37,7 +37,7 @@ router.post('/',  async (req, res) => {
     // Create review
     const review = new Review({
       postId,
-      userId: req.user._id, // Assuming req.user contains authenticated user
+      userId: req.user._id || req.user.userId, // Assuming req.user contains authenticated user
       rating,
       comment,
     });
