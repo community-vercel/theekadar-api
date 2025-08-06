@@ -3,8 +3,9 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth');
 const User = require('../models/User');
-const mongoose = require('mongoose');
+const Profile = require('../models/Profile');
 
+const mongoose = require('mongoose');
 
 router.post('/register', authController.register);
 router.post('/login', authController.login);
@@ -19,9 +20,9 @@ router.get('/:userId', async (req, res) => {
     const user = await User.findById(userId)
       .select('name email phone role isVerified createdAt')
       .populate({
-        path: 'worker',
-        model: 'Worker',
-        select: 'profileImage rating skills experience',
+        path: 'profile',
+        model: 'Profile',
+        select: 'logo skills experience callCount city town address verificationStatus',
       });
 
     if (!user) {
@@ -36,10 +37,15 @@ router.get('/:userId', async (req, res) => {
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
-      profileImage: user.worker ? user.worker.profileImage : null,
-      rating: user.worker ? user.worker.rating : null,
-      skills: user.worker ? user.worker.skills : null,
-      experience: user.worker ? user.worker.experience : null,
+      profileImage: user.profile ? user.profile.logo : null, // Map logo to profileImage
+      rating: user.profile && user.profile.rating ? user.profile.rating : null, // Assuming Profile may have rating
+      skills: user.profile ? user.profile.skills : null,
+      experience: user.profile ? user.profile.experience : null,
+      callCount: user.profile ? user.profile.callCount : 0,
+      city: user.profile ? user.profile.city : null,
+      town: user.profile ? user.profile.town : null,
+      address: user.profile ? user.profile.address : null,
+      verificationStatus: user.profile ? user.profile.verificationStatus : null,
     };
 
     res.status(200).json({ message: 'User details retrieved successfully', user: response });

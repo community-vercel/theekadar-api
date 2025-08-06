@@ -15,12 +15,20 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-// Virtual field to link Worker to User
+// Virtual field for Profile
+userSchema.virtual('profile', {
+  ref: 'Profile',
+  localField: '_id',
+  foreignField: 'userId',
+  justOne: true,
+});
+
+// Virtual field for Worker (optional, keep if Worker model is still used)
 userSchema.virtual('worker', {
-  ref: 'Worker', // Reference the Worker model
-  localField: '_id', // Match User._id
-  foreignField: 'user', // With Worker.user
-  justOne: true, // Each user has one Worker document
+  ref: 'Worker',
+  localField: '_id',
+  foreignField: 'user',
+  justOne: true,
 });
 
 // Enable virtuals in toJSON and toObject
