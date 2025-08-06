@@ -33,7 +33,7 @@ router.post('/',  async (req, res) => {
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
-
+console.log("user", req.user);
     // Create review
     const review = new Review({
       postId,
