@@ -14,7 +14,7 @@ const verificationRoutes = require('./routes/verificationRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const cityRoutes = require('./routes/city'); // Assuming you have a cityRoutes file
 const postRoutes = require('./routes/postRoutes');
-const reviewRoutes = require('./routes/review');
+const reviewRoutes = require('./routes/reviews');
 
 connectDB();
 
