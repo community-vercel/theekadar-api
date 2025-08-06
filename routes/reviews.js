@@ -8,12 +8,15 @@ const mongoose = require('mongoose');
 
 // Middleware to check if user is authenticated (adjust as per your auth setup)
 const isAuthenticated = (req, res, next) => {
+    console.log('Checking authentication...');
+console.log(req.user);
+
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   next();
 };
 
 // Create a review
-router.post('/', isAuthenticated, async (req, res) => {
+router.post('/',  async (req, res) => {
   try {
     const { postId, rating, comment } = req.body;
 
