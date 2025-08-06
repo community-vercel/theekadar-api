@@ -5,7 +5,7 @@ const postController = require('../controllers/postController');
 const { authMiddleware } = require('../middleware/auth');
 const Post = require('../models/Post');
 const User = require('../models/User');
-
+const Worker = require('../models/Worker');
 router.post('/create', authMiddleware, postController.createPost);
 router.get('/all', authMiddleware, postController.getAllPosts);
 router.get('/category/:category', async (req, res) => {
@@ -18,11 +18,11 @@ router.get('/category/:category', async (req, res) => {
     const posts = await Post.find({ category })
       .populate({
         path: 'userId',
-        select: 'name email phone role', // Include phone from User model
+        select: 'name email phone role',
         populate: {
           path: 'worker',
           model: 'Worker',
-          select: 'profileImage rating', // Include profileImage and rating from Worker model
+          select: 'profileImage rating',
         },
       })
       .skip((page - 1) * limit)
