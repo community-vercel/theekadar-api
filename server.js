@@ -14,6 +14,8 @@ const verificationRoutes = require('./routes/verificationRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const cityRoutes = require('./routes/city'); // Assuming you have a cityRoutes file
 const postRoutes = require('./routes/postRoutes');
+const reviewRoutes = require('./routes/review');
+
 connectDB();
 
 const app = express();
@@ -72,6 +74,8 @@ if (process.env.NODE_ENV !== 'production') {
 app.use('/api/auth', authRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/reviews', reviewRoutes);
+
 
 app.use('/api/posts', postRoutes);
 app.use('/api/cities', cityRoutes); // Assuming you have a cityRoutes file
