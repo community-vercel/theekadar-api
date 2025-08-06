@@ -72,7 +72,7 @@ router.get('/post/:postId', async (req, res) => {
 });
 
 // Update a review
-router.put('/:reviewId', verifyToken, async (req, res) => {
+router.put('/:reviewId', authMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
     const { rating, comment } = req.body;
@@ -103,7 +103,7 @@ router.put('/:reviewId', verifyToken, async (req, res) => {
 });
 
 // Delete a review
-router.delete('/:reviewId', verifyToken, async (req, res) => {
+router.delete('/:reviewId', authMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
 
