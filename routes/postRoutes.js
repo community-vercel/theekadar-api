@@ -22,7 +22,7 @@ router.get('/category/:category', async (req, res) => {
         populate: {
           path: 'profile',
           model: 'Profile',
-          select: 'logo skills experience callCount city town address verificationStatus',
+          select: 'logo skills experience callCount city town address verificationStatus rating',
         },
       })
       .skip((page - 1) * limit)
@@ -32,7 +32,17 @@ router.get('/category/:category', async (req, res) => {
     const total = await Post.countDocuments({ category });
 
     const formattedPosts = posts.map(post => ({
-      ...post.toObject(),
+      _id: post._id,
+      title: post.title,
+      description: post.description,
+      category: post.category,
+      images: post.images,
+      hourlyRate: post.hourlyRate,
+      availability: post.availability,
+      serviceType: post.serviceType,
+      projectScale: post.projectScale,
+      certifications: post.certifications,
+      createdAt: post.createdAt,
       userId: {
         _id: post.userId._id,
         name: post.userId.name,
@@ -41,7 +51,7 @@ router.get('/category/:category', async (req, res) => {
         role: post.userId.role,
         isVerified: post.userId.isVerified,
         profileImage: post.userId.profile ? post.userId.profile.logo : null,
-        rating: post.userId.profile && post.userId.profile.rating ? post.userId.profile.rating : null,
+        rating: post.userId.profile ? post.userId.profile.rating : null,
         skills: post.userId.profile ? post.userId.profile.skills : null,
         experience: post.userId.profile ? post.userId.profile.experience : null,
         callCount: post.userId.profile ? post.userId.profile.callCount : 0,
