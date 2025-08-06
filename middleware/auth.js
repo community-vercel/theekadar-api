@@ -23,7 +23,7 @@ function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Decoded token:', decoded);
-    User.findById(decoded._id)
+    User.findById(decoded.userId)
       .select('name email role phone')
       .then(user => {
         if (!user) {
