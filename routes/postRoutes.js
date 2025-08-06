@@ -6,6 +6,7 @@ const { authMiddleware } = require('../middleware/auth');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Worker = require('../models/Worker');
+const Profile = require('../models/profile');
 router.post('/create', authMiddleware, postController.createPost);
 router.get('/all', authMiddleware, postController.getAllPosts);
 router.get('/category/:category', async (req, res) => {
@@ -14,15 +15,14 @@ router.get('/category/:category', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
-    // Find posts by category and populate user details
     const posts = await Post.find({ category })
       .populate({
         path: 'userId',
-        select: 'name email phone role',
+        select: 'name email phone role isVerified',
         populate: {
-          path: 'worker',
-          model: 'Worker',
-          select: 'profileImage rating',
+          path: 'profile',
+          model: 'Profile',
+          select: 'logo skills experience callCount city town address verificationStatus',
         },
       })
       .skip((page - 1) * limit)
@@ -31,7 +31,6 @@ router.get('/category/:category', async (req, res) => {
 
     const total = await Post.countDocuments({ category });
 
-    // Format the response to ensure worker details are included
     const formattedPosts = posts.map(post => ({
       ...post.toObject(),
       userId: {
@@ -40,8 +39,16 @@ router.get('/category/:category', async (req, res) => {
         email: post.userId.email,
         phone: post.userId.phone,
         role: post.userId.role,
-        profileImage: post.userId.worker ? post.userId.worker.profileImage : null,
-        rating: post.userId.worker ? post.userId.worker.rating : null,
+        isVerified: post.userId.isVerified,
+        profileImage: post.userId.profile ? post.userId.profile.logo : null,
+        rating: post.userId.profile && post.userId.profile.rating ? post.userId.profile.rating : null,
+        skills: post.userId.profile ? post.userId.profile.skills : null,
+        experience: post.userId.profile ? post.userId.profile.experience : null,
+        callCount: post.userId.profile ? post.userId.profile.callCount : 0,
+        city: post.userId.profile ? post.userId.profile.city : null,
+        town: post.userId.profile ? post.userId.profile.town : null,
+        address: post.userId.profile ? post.userId.profile.address : null,
+        verificationStatus: post.userId.profile ? post.userId.profile.verificationStatus : null,
       },
     }));
 
