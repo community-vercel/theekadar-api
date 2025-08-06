@@ -5,18 +5,10 @@ const Review = require('../models/Review');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const mongoose = require('mongoose');
-
-// Middleware to check if user is authenticated (adjust as per your auth setup)
-const isAuthenticated = (req, res, next) => {
-    console.log('Checking authentication...');
-console.log(req.user);
-
-  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
-  next();
-};
+const authMiddleware = require('../middleware/auth');
 
 // Create a review
-router.post('/',  async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
     const { postId, rating, comment } = req.body;
 
@@ -33,11 +25,11 @@ router.post('/',  async (req, res) => {
     if (!post) {
       return res.status(404).json({ message: 'Post not found' });
     }
-console.log("user", req.user);
+
     // Create review
     const review = new Review({
       postId,
-      userId: req.user._id || req.user.userId, // Assuming req.user contains authenticated user
+      userId: req.user._id, // Populated by verifyToken middleware
       rating,
       comment,
     });
@@ -49,7 +41,7 @@ console.log("user", req.user);
   }
 });
 
-// Get reviews for a specific post
+// Get reviews for a specific post (no auth required)
 router.get('/post/:postId', async (req, res) => {
   try {
     const { postId } = req.params;
@@ -61,7 +53,7 @@ router.get('/post/:postId', async (req, res) => {
     }
 
     const reviews = await Review.find({ postId })
-      .populate('userId', 'name email') // Populate user details
+      .populate('userId', 'name email')
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({ createdAt: -1 });
@@ -79,8 +71,8 @@ router.get('/post/:postId', async (req, res) => {
   }
 });
 
-// Update a review (only by the review's author)
-router.put('/:reviewId', isAuthenticated, async (req, res) => {
+// Update a review
+router.put('/:reviewId', verifyToken, async (req, res) => {
   try {
     const { reviewId } = req.params;
     const { rating, comment } = req.body;
@@ -110,8 +102,8 @@ router.put('/:reviewId', isAuthenticated, async (req, res) => {
   }
 });
 
-// Delete a review (only by the review's author)
-router.delete('/:reviewId', isAuthenticated, async (req, res) => {
+// Delete a review
+router.delete('/:reviewId', verifyToken, async (req, res) => {
   try {
     const { reviewId } = req.params;
 
