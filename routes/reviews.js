@@ -5,10 +5,10 @@ const Review = require('../models/Review');
 const Post = require('../models/Post');
 const User = require('../models/User');
 const mongoose = require('mongoose');
-const authMiddleware = require('../middleware/auth');
+const {verifyToken} = require('../middleware/auth');
 
 // Create a review
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const { postId, rating, comment } = req.body;
 
@@ -72,7 +72,7 @@ router.get('/post/:postId', async (req, res) => {
 });
 
 // Update a review
-router.put('/:reviewId', authMiddleware, async (req, res) => {
+router.put('/:reviewId', verifyToken, async (req, res) => {
   try {
     const { reviewId } = req.params;
     const { rating, comment } = req.body;
@@ -103,7 +103,7 @@ router.put('/:reviewId', authMiddleware, async (req, res) => {
 });
 
 // Delete a review
-router.delete('/:reviewId', authMiddleware, async (req, res) => {
+router.delete('/:reviewId', verifyToken, async (req, res) => {
   try {
     const { reviewId } = req.params;
 
