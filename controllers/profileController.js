@@ -125,111 +125,39 @@ exports.getCallCount = async (req, res) => {
 
   res.status(200).json({ userId: profile.userId, callCount: profile.callCount });
 };
-
 exports.findProfilesNear = async (req, res) => {
-   try {
-    // Validate query parameters
+  try {
     const { error } = postSearchSchema.validate(req.query);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const {
-      city,
-      town,
-      address,
-      role,
-      category,
-      serviceType,
-      projectScale,
-      minHourlyRate,
-      maxHourlyRate,
-      availability,
-    } = req.query;
+    const { city } = req.query;
+    console.log('Query parameters:', req.query);
 
-    // Build match stage for aggregation
-    let matchStage = {
-      'profile.verificationStatus': 'approved', // Only include posts from verified profiles
-    };
-
-    // Add filters to match stage
+    let matchStage = {};
     if (city) matchStage['profile.city'] = { $regex: `^${city}$`, $options: 'i' };
-    if (town) matchStage['profile.town'] = { $regex: `^${town}$`, $options: 'i' };
-    if (address) matchStage['profile.address'] = { $regex: address, $options: 'i' };
-    if (role) matchStage['user.role'] = role;
-    if (category) matchStage.category = { $regex: category, $options: 'i' };
-    if (serviceType) matchStage.serviceType = serviceType;
-    if (projectScale) matchStage.projectScale = projectScale;
-    if (availability !== undefined) matchStage.availability = availability;
-    if (minHourlyRate || maxHourlyRate) {
-      matchStage.hourlyRate = {};
-      if (minHourlyRate) matchStage.hourlyRate.$gte = Number(minHourlyRate);
-      if (maxHourlyRate) matchStage.hourlyRate.$lte = Number(maxHourlyRate);
-    }
 
-    // Aggregation pipeline
     const posts = await Post.aggregate([
-      // Lookup to join with User collection
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'user',
-        },
-      },
-      // Unwind user array (since $lookup returns an array)
+      { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'user' } },
       { $unwind: '$user' },
-      // Lookup to join with Profile collection
-      {
-        $lookup: {
-          from: 'profiles',
-          localField: 'userId',
-          foreignField: 'userId',
-          as: 'profile',
-        },
-      },
-      // Unwind profile array
+      { $lookup: { from: 'profiles', localField: 'userId', foreignField: 'userId', as: 'profile' } },
       { $unwind: '$profile' },
-      // Match stage for filtering
       { $match: matchStage },
-      // Project only necessary fields
       {
         $project: {
           _id: 1,
           title: 1,
           description: 1,
           category: 1,
-          images: 1,
-          hourlyRate: 1,
-          availability: 1,
-          serviceType: 1,
-          projectScale: 1,
-          certifications: 1,
-          createdAt: 1,
-          user: {
-            _id: '$user._id',
-            name: '$user.name',
-            phone: '$user.phone',
-            role: '$user.role',
-            email: '$user.email',
-          },
-          profile: {
-            name: '$profile.name',
-            phone: '$profile.phone',
-            city: '$profile.city',
-            town: '$profile.town',
-            address: '$profile.address',
-            skills: '$profile.skills',
-            features: '$profile.features',
-            logo: '$profile.logo',
-            callCount: '$profile.callCount',
-          },
-        },
-      },
-      // Sort by createdAt (newest first)
-      { $sort: { createdAt: -1 } },
+          user: { _id: '$user._id', name: '$user.name', role: '$user.role' },
+          profile: { city: '$profile.city', verificationStatus: '$profile.verificationStatus' }
+        }
+      }
     ]);
 
+    console.log('Found posts:', posts);
     res.json(posts);
   } catch (err) {
+    console.error('Error:', err);
     res.status(500).json({ message: 'Error performing query', error: err.message });
-  }};
+  }
+};
