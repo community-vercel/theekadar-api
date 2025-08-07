@@ -18,11 +18,12 @@ const profileSchema = Joi.object({
 
 // Validation schema for near query
 const nearSchema = Joi.object({
-  lng: Joi.number().min(-180).max(180).required(),
-  lat: Joi.number().min(-90).max(90).required(),
-  radius: Joi.number().min(0).required(), // In kilometers
-  role: Joi.string().valid('worker', 'thekadar', 'small_consultant', 'large_consultant').optional(),
+ 
+  city: Joi.string().optional(),
+  town: Joi.string().optional(),
+  address: Joi.string().optional(),
 });
+
 
 exports.createProfile = async (req, res) => {
   const { error } = profileSchema.validate(req.body);
