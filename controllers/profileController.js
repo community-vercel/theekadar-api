@@ -2,6 +2,7 @@
 const Joi = require('joi');
 const User = require('../models/User');
 const Profile = require('../models/profile');
+const Post = require('../models/Post');
 const { uploadFile } = require('../utils/vercelBlob');
 
 // Validation schema for profile creation and update
@@ -17,11 +18,17 @@ const profileSchema = Joi.object({
 });
 
 // Validation schema for near query
-const nearSchema = Joi.object({
- 
+const postSearchSchema = Joi.object({
   city: Joi.string().optional(),
   town: Joi.string().optional(),
   address: Joi.string().optional(),
+  role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant').optional(),
+  category: Joi.string().optional(),
+  serviceType: Joi.string().valid('general', 'specialized', 'emergency', 'long_term').optional(),
+  projectScale: Joi.string().valid('small', 'medium', 'large').optional(),
+  minHourlyRate: Joi.number().min(0).optional(),
+  maxHourlyRate: Joi.number().min(0).optional(),
+  availability: Joi.boolean().optional(),
 });
 
 
@@ -120,36 +127,109 @@ exports.getCallCount = async (req, res) => {
 };
 
 exports.findProfilesNear = async (req, res) => {
-  const { error } = nearSchema.validate(req.query);
-  if (error) return res.status(400).json({ message: error.details[0].message });
+   try {
+    // Validate query parameters
+    const { error } = postSearchSchema.validate(req.query);
+    if (error) return res.status(400).json({ message: error.details[0].message });
 
-  const { city, town, address, role } = req.query;
+    const {
+      city,
+      town,
+      address,
+      role,
+      category,
+      serviceType,
+      projectScale,
+      minHourlyRate,
+      maxHourlyRate,
+      availability,
+    } = req.query;
 
-  // Build query
-  let query = {
-    city: { $regex: `^${city}$`, $options: 'i' }, // Case-insensitive exact match for city
-    town: { $regex: `^${town}$`, $options: 'i' }, // Case-insensitive exact match for town
-    verificationStatus: 'approved', // Only return verified profiles
-  };
+    // Build match stage for aggregation
+    let matchStage = {
+      'profile.verificationStatus': 'approved', // Only include posts from verified profiles
+    };
 
-  // Add address filter if provided (partial match)
-  if (address) {
-    query.address = { $regex: address, $options: 'i' }; // Case-insensitive partial match
-  }
+    // Add filters to match stage
+    if (city) matchStage['profile.city'] = { $regex: `^${city}$`, $options: 'i' };
+    if (town) matchStage['profile.town'] = { $regex: `^${town}$`, $options: 'i' };
+    if (address) matchStage['profile.address'] = { $regex: address, $options: 'i' };
+    if (role) matchStage['user.role'] = role;
+    if (category) matchStage.category = { $regex: category, $options: 'i' };
+    if (serviceType) matchStage.serviceType = serviceType;
+    if (projectScale) matchStage.projectScale = projectScale;
+    if (availability !== undefined) matchStage.availability = availability;
+    if (minHourlyRate || maxHourlyRate) {
+      matchStage.hourlyRate = {};
+      if (minHourlyRate) matchStage.hourlyRate.$gte = Number(minHourlyRate);
+      if (maxHourlyRate) matchStage.hourlyRate.$lte = Number(maxHourlyRate);
+    }
 
-  // Add role filter if provided
-  if (role) {
-    query['userId.role'] = role;
-  }
+    // Aggregation pipeline
+    const posts = await Post.aggregate([
+      // Lookup to join with User collection
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      // Unwind user array (since $lookup returns an array)
+      { $unwind: '$user' },
+      // Lookup to join with Profile collection
+      {
+        $lookup: {
+          from: 'profiles',
+          localField: 'userId',
+          foreignField: 'userId',
+          as: 'profile',
+        },
+      },
+      // Unwind profile array
+      { $unwind: '$profile' },
+      // Match stage for filtering
+      { $match: matchStage },
+      // Project only necessary fields
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          description: 1,
+          category: 1,
+          images: 1,
+          hourlyRate: 1,
+          availability: 1,
+          serviceType: 1,
+          projectScale: 1,
+          certifications: 1,
+          createdAt: 1,
+          user: {
+            _id: '$user._id',
+            name: '$user.name',
+            phone: '$user.phone',
+            role: '$user.role',
+            email: '$user.email',
+          },
+          profile: {
+            name: '$profile.name',
+            phone: '$profile.phone',
+            city: '$profile.city',
+            town: '$profile.town',
+            address: '$profile.address',
+            skills: '$profile.skills',
+            features: '$profile.features',
+            logo: '$profile.logo',
+            callCount: '$profile.callCount',
+          },
+        },
+      },
+      // Sort by createdAt (newest first)
+      { $sort: { createdAt: -1 } },
+    ]);
 
-  try {
-    // Find profiles, populate user role
-    const profiles = await Profile.find(query)
-      .populate('userId', 'role')
-      .select('userId name phone city town address skills features logo callCount');
-
-    res.json(profiles);
+    res.json(posts);
   } catch (err) {
     res.status(500).json({ message: 'Error performing query', error: err.message });
-  }
-};
+  }};
