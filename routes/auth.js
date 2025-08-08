@@ -52,6 +52,7 @@ router.get('/:userId', async (req, res) => {
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
+      
       profileImage: user.profile ? user.profile.logo : null,
       rating: averageRating,
       skills: user.profile ? user.profile.skills : null,

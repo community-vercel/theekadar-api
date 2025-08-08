@@ -23,7 +23,7 @@ exports.getTopPosts = async (req, res) => {
   try {
     // Aggregate posts with profile and review data
     const posts = await Post.aggregate([
-      // Lookup Profile to get callCount
+      // Lookup Profile to get callCount and logo
       {
         $lookup: {
           from: 'profiles',
@@ -92,11 +92,11 @@ exports.getTopPosts = async (req, res) => {
           certifications: 1,
           createdAt: 1,
           callCount: 1,
-          averageRating: 1,
+          averageRating: { $round: ['$averageRating', 1] },
           weightedScore: {
             $add: [
-              { $multiply: [{ $divide: ['$callCount', 100] }, 0.5] }, // Normalize callCount (assuming max 100)
-              { $multiply: ['$averageRating', 0.5] }, // Weight rating equally
+              { $multiply: [{ $divide: ['$callCount', 100] }, 0.5] }, // Normalize callCount
+              { $multiply: ['$averageRating', 0.1] }, // Scale rating
             ],
           },
           user: {
@@ -108,16 +108,13 @@ exports.getTopPosts = async (req, res) => {
             isVerified: '$user.isVerified',
             createdAt: '$user.createdAt',
           },
-          profile: {
-            profileImage: '$profile.logo',
-            skills: '$profile.skills',
-            experience: '$profile.experience',
-            callCount: '$profile.callCount',
-            city: '$profile.city',
-            town: '$profile.town',
-            address: '$profile.address',
-            verificationStatus: '$profile.verificationStatus',
-          },
+          profileImage: { $ifNull: ['$profile.logo', null] }, // Map logo to profileImage
+          skills: { $ifNull: ['$profile.skills', null] },
+          experience: { $ifNull: ['$profile.experience', null] },
+          city: { $ifNull: ['$profile.city', null] },
+          town: { $ifNull: ['$profile.town', null] },
+          address: { $ifNull: ['$profile.address', null] },
+          verificationStatus: { $ifNull: ['$profile.verificationStatus', null] },
         },
       },
       // Sort by weighted score (descending) and limit to 10
