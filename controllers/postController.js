@@ -166,3 +166,219 @@ exports.getAllPosts = async (req, res) => {
 
   res.json(posts);
 };
+
+exports.getPost = async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({ success: false, message: 'Invalid post ID' });
+    }
+
+    const post = await Post.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(postId) } },
+      {
+        $lookup: {
+          from: 'profiles',
+          localField: 'userId',
+          foreignField: 'userId',
+          as: 'profile',
+        },
+      },
+      { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'postId',
+          as: 'reviews',
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          postId: '$_id',
+          postName: '$title',
+          name: '$user.name',
+          profileImage: { $ifNull: ['$profile.logo', null] },
+          address: { $ifNull: ['$profile.address', null] },
+          experience: { $ifNull: ['$profile.experience', null] },
+          rating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $round: [{ $avg: '$reviews.rating' }, 1] },
+              else: null,
+            },
+          },
+          description: 1,
+          category: 1,
+          images: 1,
+          hourlyRate: 1,
+          availability: 1,
+          serviceType: 1,
+          projectScale: 1,
+          certifications: 1,
+          createdAt: 1,
+        },
+      },
+    ]);
+
+    if (!post.length) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Post retrieved successfully',
+      data: post[0],
+    });
+  } catch (error) {
+    console.error('Get post error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updatePost = async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { title, description, category, images, hourlyRate, availability, serviceType, projectScale, certifications } = req.body;
+
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({ success: false, message: 'Invalid post ID' });
+    }
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
+
+    if (post.userId.toString() !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to update this post' });
+    }
+
+    const updateData = {};
+    if (title) updateData.title = title;
+    if (description) updateData.description = description;
+    if (category) updateData.category = category;
+    if (images) updateData.images = images;
+    if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
+    if (availability !== undefined) updateData.availability = availability;
+    if (serviceType) updateData.serviceType = serviceType;
+    if (projectScale) updateData.projectScale = projectScale;
+    if (certifications) updateData.certifications = certifications;
+
+    const updatedPost = await Post.findByIdAndUpdate(postId, { $set: updateData }, { new: true, runValidators: true });
+
+    res.status(200).json({
+      success: true,
+      message: 'Post updated successfully',
+      data: updatedPost,
+    });
+  } catch (error) {
+    console.error('Update post error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deletePost = async (req, res) => {
+  try {
+    const { postId } = req.params;
+
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({ success: false, message: 'Invalid post ID' });
+    }
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
+
+    if (post.userId.toString() !== req.user.userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to delete this post' });
+    }
+
+    await Post.findByIdAndDelete(postId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Post deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete post error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getUserPosts = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const posts = await Post.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      {
+        $lookup: {
+          from: 'profiles',
+          localField: 'userId',
+          foreignField: 'userId',
+          as: 'profile',
+        },
+      },
+      { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'postId',
+          as: 'reviews',
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          postId: '$_id',
+          postName: '$title',
+          name: '$user.name',
+          profileImage: { $ifNull: ['$profile.logo', null] },
+          address: { $ifNull: ['$profile.address', null] },
+          experience: { $ifNull: ['$profile.experience', null] },
+          rating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $round: [{ $avg: '$reviews.rating' }, 1] },
+              else: null,
+            },
+          },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'User posts retrieved successfully',
+      data: posts,
+    });
+  } catch (error) {
+    console.error('Get user posts error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
