@@ -8,6 +8,7 @@ const User = require('../models/User');
 const Worker = require('../models/Worker');
 const Profile = require('../models/profile');
 const Review=require('../models/Review');
+const mongoose = require('mongoose');
 
 router.post('/create', authMiddleware, postController.createPost);
 router.get('/all', authMiddleware, postController.getAllPosts);
@@ -16,7 +17,7 @@ router.get('/all', authMiddleware, postController.getAllPosts);
 
 
 // routes/postRoutes.js (or authRoutes.js, depending on your setup)
-router.get('/:postId', async (req, res) => {
+router.get('/:postId',authMiddleware, async (req, res) => {
   try {
     const { postId } = req.params;
 
