@@ -3,7 +3,8 @@ const Joi = require('joi');
 const User = require('../models/User');
 const Post = require('../models/Post');
 const { put } = require('@vercel/blob');
-
+const Profile = require('../models/profile');
+const Review = require('../models/Review');
 const postSchema = Joi.object({
   title: Joi.string().required(),
   description: Joi.string().required(),
@@ -18,7 +19,122 @@ const postSchema = Joi.object({
   ).optional(),
   images: Joi.array().items(Joi.string()).optional(), // Expect base64 strings or file data
 });
+exports.getTopPosts = async (req, res) => {
+  try {
+    // Aggregate posts with profile and review data
+    const posts = await Post.aggregate([
+      // Lookup Profile to get callCount
+      {
+        $lookup: {
+          from: 'profiles',
+          localField: 'userId',
+          foreignField: 'userId',
+          as: 'profile',
+        },
+      },
+      { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+      // Lookup Reviews to calculate average rating
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'postId',
+          as: 'reviews',
+        },
+      },
+      // Project fields and calculate average rating
+      {
+        $project: {
+          _id: 1,
+          userId: 1,
+          title: 1,
+          description: 1,
+          category: 1,
+          images: 1,
+          hourlyRate: 1,
+          availability: 1,
+          serviceType: 1,
+          projectScale: 1,
+          certifications: 1,
+          createdAt: 1,
+          callCount: { $ifNull: ['$profile.callCount', 0] },
+          averageRating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $avg: '$reviews.rating' },
+              else: 0,
+            },
+          },
+        },
+      },
+      // Lookup User for user details
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      // Project final fields and calculate weighted score
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          description: 1,
+          category: 1,
+          images: 1,
+          hourlyRate: 1,
+          availability: 1,
+          serviceType: 1,
+          projectScale: 1,
+          certifications: 1,
+          createdAt: 1,
+          callCount: 1,
+          averageRating: 1,
+          weightedScore: {
+            $add: [
+              { $multiply: [{ $divide: ['$callCount', 100] }, 0.5] }, // Normalize callCount (assuming max 100)
+              { $multiply: ['$averageRating', 0.5] }, // Weight rating equally
+            ],
+          },
+          user: {
+            _id: '$user._id',
+            name: '$user.name',
+            email: '$user.email',
+            phone: '$user.phone',
+            role: '$user.role',
+            isVerified: '$user.isVerified',
+            createdAt: '$user.createdAt',
+          },
+          profile: {
+            profileImage: '$profile.logo',
+            skills: '$profile.skills',
+            experience: '$profile.experience',
+            callCount: '$profile.callCount',
+            city: '$profile.city',
+            town: '$profile.town',
+            address: '$profile.address',
+            verificationStatus: '$profile.verificationStatus',
+          },
+        },
+      },
+      // Sort by weighted score (descending) and limit to 10
+      { $sort: { weightedScore: -1 } },
+      { $limit: 10 },
+    ]);
 
+    res.status(200).json({
+      success: true,
+      message: 'Top 10 posts retrieved successfully',
+      data: posts,
+    });
+  } catch (error) {
+    console.error('Get top posts error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 exports.createPost = async (req, res) => {
   // Validate request body
   const { error } = postSchema.validate(req.body);

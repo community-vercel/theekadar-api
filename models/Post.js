@@ -5,27 +5,19 @@ const postSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String, required: true },
   description: { type: String, required: true },
-  category: {
-    type: String,
-    required: true,
-  },
-  images: [{ type: String }], // Array of image URLs
-  hourlyRate: { 
-    type: Number, 
-    // We'll validate this in the pre-save hook based on user role
-  },
+  category: { type: String, required: true },
+  images: [{ type: String }],
+  hourlyRate: { type: Number },
   availability: { type: Boolean, default: true },
-  serviceType: { 
-    type: String, 
-    enum: ['general', 'specialized', 'emergency', 'long_term'], 
-  },
-  projectScale: { 
-    type: String, 
-    enum: ['small', 'medium', 'large'], 
-  },
+  serviceType: { type: String, enum: ['general', 'specialized', 'emergency', 'long_term'] },
+  projectScale: { type: String, enum: ['small', 'medium', 'large'] },
   certifications: [{ type: String }],
   createdAt: { type: Date, default: Date.now },
 });
+
+// Indexes for efficient querying
+postSchema.index({ userId: 1 });
+postSchema.index({ createdAt: -1 });
 
 postSchema.pre('save', async function(next) {
   try {

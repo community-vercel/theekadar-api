@@ -13,6 +13,7 @@ const mongoose = require('mongoose');
 router.post('/create', authMiddleware, postController.createPost);
 router.get('/all', authMiddleware, postController.getAllPosts);
 
+router.get('/top', authMiddleware,postController.getTopPosts);
 
 
 
