@@ -238,3 +238,68 @@ exports.deleteJob = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+exports.getUserJobs = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const jobs = await Post.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+      {
+        $lookup: {
+          from: 'profiles',
+          localField: 'userId',
+          foreignField: 'userId',
+          as: 'profile',
+        },
+      },
+      { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'postId',
+          as: 'reviews',
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          postId: '$_id',
+          postName: '$title',
+          name: '$user.name',
+          profileImage: { $ifNull: ['$profile.logo', null] },
+          address: { $ifNull: ['$profile.address', null] },
+          experience: { $ifNull: ['$profile.experience', null] },
+          rating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $round: [{ $avg: '$reviews.rating' }, 1] },
+              else: null,
+            },
+          },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: 'User jobs retrieved successfully',
+      data: jobs,
+    });
+  } catch (error) {
+    console.error('Get user jobs error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
