@@ -5,6 +5,8 @@ const Post = require('../models/Post');
 const { put } = require('@vercel/blob');
 const Profile = require('../models/profile');
 const Review = require('../models/Review');
+const mongoose = require('mongoose');
+
 const postSchema = Joi.object({
   title: Joi.string().required(),
   description: Joi.string().required(),
