@@ -4,7 +4,8 @@ const router = express.Router();
 const authController = require('../controllers/auth');
 const User = require('../models/User');
 const Profile = require('../models/profile');
-const Post=require('../models/Post')
+const Post=require('../models/Post');
+const Review=require('../models/Review');
 const mongoose = require('mongoose');
 
 router.post('/register', authController.register);
