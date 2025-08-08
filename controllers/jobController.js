@@ -9,7 +9,7 @@ const Joi = require('joi');
 const jobSchema = Joi.object({
   title: Joi.string().required().trim(),
   description: Joi.string().required().trim(),
-  category: Joi.string().valid('plumbing', 'electrical', 'carpentry', 'painting', 'construction', 'consulting', 'other').required(),
+  category: Joi.string().required(),
   budget: Joi.number().min(0).required(),
   location: Joi.object({
     city: Joi.string().required(),

@@ -7,7 +7,6 @@ const jobSchema = new mongoose.Schema({
   description: { type: String, required: true, trim: true },
   category: { 
     type: String, 
-    enum: ['plumbing', 'electrical', 'carpentry', 'painting', 'construction', 'consulting', 'other'], 
     required: true 
   },
   budget: { type: Number, required: true, min: 0 },
