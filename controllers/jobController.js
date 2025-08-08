@@ -246,7 +246,7 @@ exports.getUserJobs = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid user ID' });
     }
 
-    const jobs = await Post.aggregate([
+    const jobs = await Job.aggregate([
       { $match: { userId: new mongoose.Types.ObjectId(userId) } },
       {
         $lookup: {
@@ -259,14 +259,6 @@ exports.getUserJobs = async (req, res) => {
       { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: 'reviews',
-          localField: '_id',
-          foreignField: 'postId',
-          as: 'reviews',
-        },
-      },
-      {
-        $lookup: {
           from: 'users',
           localField: 'userId',
           foreignField: '_id',
@@ -276,19 +268,20 @@ exports.getUserJobs = async (req, res) => {
       { $unwind: '$user' },
       {
         $project: {
-          postId: '$_id',
-          postName: '$title',
+          jobId: '$_id',
+          title: 1,
+          description: 1,
+          category: 1,
+          budget: 1,
+          location: 1,
+          status: 1,
+          skillsRequired: 1,
+          createdAt: 1,
+          updatedAt: 1,
           name: '$user.name',
           profileImage: { $ifNull: ['$profile.logo', null] },
           address: { $ifNull: ['$profile.address', null] },
           experience: { $ifNull: ['$profile.experience', null] },
-          rating: {
-            $cond: {
-              if: { $gt: [{ $size: '$reviews' }, 0] },
-              then: { $round: [{ $avg: '$reviews.rating' }, 1] },
-              else: null,
-            },
-          },
         },
       },
     ]);
