@@ -23,13 +23,6 @@ userSchema.virtual('profile', {
   justOne: true,
 });
 
-// Virtual field for Worker (optional, keep if Worker model is still used)
-userSchema.virtual('worker', {
-  ref: 'Worker',
-  localField: '_id',
-  foreignField: 'user',
-  justOne: true,
-});
 
 // Enable virtuals in toJSON and toObject
 userSchema.set('toObject', { virtuals: true });
