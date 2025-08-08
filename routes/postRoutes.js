@@ -17,7 +17,8 @@ router.get('/all', authMiddleware, postController.getAllPosts);
 
 
 // routes/postRoutes.js (or authRoutes.js, depending on your setup)
-router.get('/:postId',authMiddleware, async (req, res) => {
+// routes/postRoutes.js
+router.get('/:postId', async (req, res) => {
   try {
     const { postId } = req.params;
 
@@ -65,6 +66,7 @@ router.get('/:postId',authMiddleware, async (req, res) => {
       projectScale: post.projectScale,
       certifications: post.certifications,
       createdAt: post.createdAt,
+      rating: averageRating, // Post-specific rating
       user: {
         _id: post.userId._id,
         name: post.userId.name,
@@ -74,7 +76,7 @@ router.get('/:postId',authMiddleware, async (req, res) => {
         isVerified: post.userId.isVerified,
         createdAt: post.userId.createdAt,
         profileImage: post.userId.profile ? post.userId.profile.logo : null,
-        rating: averageRating, // Use post-specific rating
+        profileRating: post.userId.profile ? post.userId.profile.rating : null, // Profile rating (if stored)
         skills: post.userId.profile ? post.userId.profile.skills : null,
         experience: post.userId.profile ? post.userId.profile.experience : null,
         callCount: post.userId.profile ? post.userId.profile.callCount : 0,
