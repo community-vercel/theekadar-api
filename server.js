@@ -75,6 +75,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/jobs', require('./routes/jobRoutes'));
+
 
 
 app.use('/api/posts', postRoutes);
