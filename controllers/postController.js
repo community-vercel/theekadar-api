@@ -1,4 +1,3 @@
-// controllers/postController.js
 const Joi = require('joi');
 const formidable = require('formidable');
 const User = require('../models/User');
@@ -20,8 +19,11 @@ const postSchema = Joi.object({
 });
 
 exports.createPost = async (req, res) => {
-  // Initialize formidable to parse form-data
-  const form = new formidable.IncomingForm({ multiples: true });
+  // Initialize formidable with file size limit (5MB)
+  const form = new formidable.IncomingForm({
+    multiples: true,
+    maxFileSize: 5 * 1024 * 1024, // 5MB limit
+  });
 
   try {
     // Parse the incoming request
@@ -43,24 +45,29 @@ exports.createPost = async (req, res) => {
     if (error) return res.status(400).json({ message: error.details[0].message });
 
     // Check if user is verified
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user.userId).lean(); // Use lean for faster query
     if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
 
-    // Handle file uploads
+    // Handle file uploads (sequential, max 5 files)
     let imageUrls = [];
     if (files.images) {
       const images = Array.isArray(files.images) ? files.images : [files.images];
-      imageUrls = await Promise.all(
-        images.map(async (file) => {
-          const fileData = {
-            buffer: file.buffer || file._writeStream, // formidable v3 uses buffer, older versions might use _writeStream
-            name: file.originalFilename,
-            mimetype: file.mimetype,
-            size: file.size,
-          };
-          return await uploadFile(fileData);
-        })
-      );
+      if (images.length > 5) {
+        return res.status(400).json({ message: 'Maximum 5 images allowed' });
+      }
+      for (const file of images) {
+        if (!file.mimetype.startsWith('image/')) {
+          return res.status(400).json({ message: 'Only image files are allowed' });
+        }
+        const fileData = {
+          buffer: file.buffer,
+          name: file.originalFilename,
+          mimetype: file.mimetype,
+          size: file.size,
+        };
+        const url = await uploadFile(fileData); // Sequential upload
+        imageUrls.push(url);
+      }
     }
 
     // Create new post
@@ -81,21 +88,28 @@ exports.createPost = async (req, res) => {
     res.status(201).json(post);
   } catch (error) {
     console.error('Error creating post:', error);
+    if (error.name === 'FileTooLargeError') {
+      return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
 exports.getAllPosts = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user.userId).lean();
     let posts;
 
     if (user.role === 'client') {
-      posts = await Post.find().populate('userId', 'role');
+      posts = await Post.find().populate('userId', 'role').lean();
     } else if (user.role === 'worker') {
-      posts = await Post.find({ 'userId.role': { $in: ['client', 'thekadar', 'small_consultant', 'large_consultant'] } }).populate('userId', 'role');
+      posts = await Post.find({ 'userId.role': { $in: ['client', 'thekadar', 'small_consultant', 'large_consultant'] } })
+        .populate('userId', 'role')
+        .lean();
     } else {
-      posts = await Post.find({ 'userId.role': { $in: ['client', 'worker'] } }).populate('userId', 'role');
+      posts = await Post.find({ 'userId.role': { $in: ['client', 'worker'] } })
+        .populate('userId', 'role')
+        .lean();
     }
 
     res.json(posts);
