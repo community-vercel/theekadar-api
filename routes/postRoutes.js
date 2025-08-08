@@ -5,8 +5,8 @@ const postController = require('../controllers/postController');
 const { authMiddleware } = require('../middleware/auth');
 const Post = require('../models/Post');
 const User = require('../models/User');
+const Worker = require('../models/Worker');
 const Profile = require('../models/profile');
-
 router.post('/create', authMiddleware, postController.createPost);
 router.get('/all', authMiddleware, postController.getAllPosts);
 router.get('/category/:category', async (req, res) => {
@@ -69,9 +69,9 @@ router.get('/category/:category', async (req, res) => {
       pages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error('Error fetching posts by category:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 module.exports = router;
