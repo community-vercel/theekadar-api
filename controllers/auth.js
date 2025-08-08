@@ -22,48 +22,22 @@ const loginSchema = Joi.object({
 });
 
 // controllers/authController.js
-
 exports.register = async (req, res) => {
-  const { email, password, name, phone, role, city, town, address, skills, experience } = req.body;
+  const { error } = registerSchema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
 
-  try {
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ message: 'User already exists' });
+  const { email, password, name, phone, role } = req.body;
 
-    // Create new user
-    user = new User({
-      email,
-      password: await bcrypt.hash(password, 10),
-      name,
-      phone,
-      role,
-    });
+  const existingUser = await User.findOne({ email });
+  if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
-    await user.save();
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = new User({ email, password: hashedPassword, name, phone, role });
+  await user.save();
 
-    // Create profile
-    const profile = new Profile({
-      userId: user._id || user.userId,
-      name,
-      phone,
-      city: city || '', // Required field
-      town: town || '', // Required field
-      address,
-      experience: experience || 0, // Required field
-      skills: skills || [],
-    });
-
-    await profile.save();
-
-    // Generate JWT
-    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-  res.status(201).json({ token, userId: user._id || user.userId });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
+  const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  res.status(201).json({ token, userId: user._id });
 };
-
 exports.login = async (req, res) => {
   const { error } = loginSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
