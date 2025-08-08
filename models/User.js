@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema({
   },
   isVerified: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
+  resetPasswordToken: { type: String }, // New field for reset token
+  resetPasswordExpires: { type: Date }, // New field for token expiration
 });
 
 // Virtual field for Profile
@@ -22,7 +24,6 @@ userSchema.virtual('profile', {
   foreignField: 'userId',
   justOne: true,
 });
-
 
 // Enable virtuals in toJSON and toObject
 userSchema.set('toObject', { virtuals: true });

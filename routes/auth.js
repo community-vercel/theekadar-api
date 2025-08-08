@@ -10,6 +10,9 @@ const mongoose = require('mongoose');
 
 router.post('/register', authController.register);
 router.post('/login', authController.login);
+router.post('/forgot-password', authController.forgotPassword); // New forgot password endpoint
+router.post('/reset-password/:token', authController.resetPassword); // New reset password endpoint
+
 // routes/authRoutes.js
 router.get('/:userId', async (req, res) => {
   try {
