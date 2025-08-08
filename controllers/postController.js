@@ -21,9 +21,8 @@ const postSchema = Joi.object({
 });
 exports.getTopPosts = async (req, res) => {
   try {
-    // Aggregate posts with profile and review data
     const posts = await Post.aggregate([
-      // Lookup Profile to get callCount and logo
+      // Lookup Profile for logo, address, experience, callCount
       {
         $lookup: {
           from: 'profiles',
@@ -33,7 +32,7 @@ exports.getTopPosts = async (req, res) => {
         },
       },
       { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
-      // Lookup Reviews to calculate average rating
+      // Lookup Reviews for average rating
       {
         $lookup: {
           from: 'reviews',
@@ -42,32 +41,7 @@ exports.getTopPosts = async (req, res) => {
           as: 'reviews',
         },
       },
-      // Project fields and calculate average rating
-      {
-        $project: {
-          _id: 1,
-          userId: 1,
-          title: 1,
-          description: 1,
-          category: 1,
-          images: 1,
-          hourlyRate: 1,
-          availability: 1,
-          serviceType: 1,
-          projectScale: 1,
-          certifications: 1,
-          createdAt: 1,
-          callCount: { $ifNull: ['$profile.callCount', 0] },
-          averageRating: {
-            $cond: {
-              if: { $gt: [{ $size: '$reviews' }, 0] },
-              then: { $avg: '$reviews.rating' },
-              else: 0,
-            },
-          },
-        },
-      },
-      // Lookup User for user details
+      // Lookup User for name
       {
         $lookup: {
           from: 'users',
@@ -77,44 +51,36 @@ exports.getTopPosts = async (req, res) => {
         },
       },
       { $unwind: '$user' },
-      // Project final fields and calculate weighted score
+      // Project required fields and calculate average rating
       {
         $project: {
-          _id: 1,
-          title: 1,
-          description: 1,
-          category: 1,
-          images: 1,
-          hourlyRate: 1,
-          availability: 1,
-          serviceType: 1,
-          projectScale: 1,
-          certifications: 1,
-          createdAt: 1,
-          callCount: 1,
-          averageRating: { $round: ['$averageRating', 1] },
+          postId: '$_id',
+          postName: '$title',
+          name: '$user.name',
+          profileImage: { $ifNull: ['$profile.logo', null] },
+          address: { $ifNull: ['$profile.address', null] },
+          experience: { $ifNull: ['$profile.experience', null] },
+          rating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $round: [{ $avg: '$reviews.rating' }, 1] },
+              else: null,
+            },
+          },
+          callCount: { $ifNull: ['$profile.callCount', 0] },
           weightedScore: {
             $add: [
-              { $multiply: [{ $divide: ['$callCount', 100] }, 0.5] }, // Normalize callCount
-              { $multiply: ['$averageRating', 0.1] }, // Scale rating
+              { $multiply: [{ $divide: [{ $ifNull: ['$profile.callCount', 0] }, 100] }, 0.5] }, // Normalize callCount
+              { $multiply: [
+                { $cond: {
+                  if: { $gt: [{ $size: '$reviews' }, 0] },
+                  then: { $avg: '$reviews.rating' },
+                  else: 0,
+                } },
+                0.1
+              ] }, // Scale rating
             ],
           },
-          user: {
-            _id: '$user._id',
-            name: '$user.name',
-            email: '$user.email',
-            phone: '$user.phone',
-            role: '$user.role',
-            isVerified: '$user.isVerified',
-            createdAt: '$user.createdAt',
-          },
-          profileImage: { $ifNull: ['$profile.logo', null] }, // Map logo to profileImage
-          skills: { $ifNull: ['$profile.skills', null] },
-          experience: { $ifNull: ['$profile.experience', null] },
-          city: { $ifNull: ['$profile.city', null] },
-          town: { $ifNull: ['$profile.town', null] },
-          address: { $ifNull: ['$profile.address', null] },
-          verificationStatus: { $ifNull: ['$profile.verificationStatus', null] },
         },
       },
       // Sort by weighted score (descending) and limit to 10
