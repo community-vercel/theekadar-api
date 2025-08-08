@@ -33,11 +33,15 @@ const profileSchema = Joi.object({
   logo: Joi.string().optional(),
 });
 
+// controllers/profileController.js
 exports.createProfile = async (req, res) => {
+    console.log('req.user:', req.user); // Debug: Log req.user
+  console.log('userId:', req.user?.userId); // De
   const { error } = profileSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   const user = await User.findById(req.user.userId);
+  if (!user) return res.status(404).json({ message: 'User not found' }); // Add this check
   if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
 
   const existingProfile = await Profile.findOne({ userId: req.user.userId });
@@ -75,7 +79,7 @@ exports.createProfile = async (req, res) => {
       city: req.body.city,
       town: req.body.town,
       address: req.body.address,
-      experience: req.body.experience, // Fixed: 'experiance' → 'experience'
+      experience: req.body.experience, // Use 'experience' (assuming schema is updated)
       logo: logoUrl,
       skills: skills || [],
       features: features || [],
@@ -87,7 +91,6 @@ exports.createProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to create profile', error: error.message });
   }
 };
-
 exports.updateProfile = async (req, res) => {
   const { error } = profileSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
