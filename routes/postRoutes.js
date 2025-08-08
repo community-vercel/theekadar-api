@@ -7,8 +7,92 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Worker = require('../models/Worker');
 const Profile = require('../models/profile');
-router.post('/create', authMiddleware, postController.createPost);
+
+// Middleware to parse raw file data
+const parseFormData = (req, res, next) => {
+  if (req.is('multipart/form-data')) {
+    let data = '';
+    let boundary;
+    
+    // Extract boundary from content-type header
+    const contentType = req.headers['content-type'];
+    const boundaryMatch = contentType.match(/boundary=(.+)$/);
+    if (boundaryMatch) {
+      boundary = '--' + boundaryMatch[1];
+    }
+
+    req.setEncoding('binary');
+    
+    req.on('data', chunk => {
+      data += chunk;
+    });
+    
+    req.on('end', () => {
+      try {
+        const parts = data.split(boundary);
+        req.body = {};
+        req.files = [];
+        
+        parts.forEach(part => {
+          if (part.trim() === '' || part.trim() === '--') return;
+          
+          const [headers, content] = part.split('\r\n\r\n');
+          if (!headers || !content) return;
+          
+          const nameMatch = headers.match(/name="([^"]+)"/);
+          const filenameMatch = headers.match(/filename="([^"]+)"/);
+          const contentTypeMatch = headers.match(/Content-Type: (.+)/);
+          
+          if (nameMatch) {
+            const fieldName = nameMatch[1];
+            
+            if (filenameMatch && contentTypeMatch) {
+              // This is a file
+              const filename = filenameMatch[1];
+              const contentType = contentTypeMatch[1].trim();
+              const fileContent = content.substring(0, content.length - 2); // Remove \r\n at end
+              
+              req.files.push({
+                fieldname: fieldName,
+                originalname: filename,
+                mimetype: contentType,
+                buffer: Buffer.from(fileContent, 'binary'),
+                size: Buffer.byteLength(fileContent, 'binary')
+              });
+            } else {
+              // This is a regular field
+              const value = content.substring(0, content.length - 2).trim();
+              
+              // Handle arrays (like certifications)
+              if (req.body[fieldName]) {
+                if (Array.isArray(req.body[fieldName])) {
+                  req.body[fieldName].push(value);
+                } else {
+                  req.body[fieldName] = [req.body[fieldName], value];
+                }
+              } else {
+                req.body[fieldName] = value;
+              }
+            }
+          }
+        });
+        
+        console.log('Parsed body:', req.body);
+        console.log('Parsed files:', req.files.map(f => ({ name: f.originalname, size: f.size })));
+        next();
+      } catch (error) {
+        console.error('Form parsing error:', error);
+        res.status(400).json({ message: 'Invalid form data' });
+      }
+    });
+  } else {
+    next();
+  }
+};
+
+router.post('/create', authMiddleware, parseFormData, postController.createPost);
 router.get('/all', authMiddleware, postController.getAllPosts);
+
 router.get('/category/:category', async (req, res) => {
   try {
     const { category } = req.params;
@@ -72,6 +156,5 @@ router.get('/category/:category', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-
 
 module.exports = router;

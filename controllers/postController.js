@@ -2,7 +2,7 @@
 const Joi = require('joi');
 const User = require('../models/User');
 const Post = require('../models/Post');
-const { uploadFile } = require('../utils/vercelBlob');
+const { put } = require('@vercel/blob');
 
 const postSchema = Joi.object({
   title: Joi.string().required(),
@@ -16,8 +16,43 @@ const postSchema = Joi.object({
     Joi.array().items(Joi.string()),
     Joi.string()
   ).optional(),
-  images: Joi.array().items(Joi.string()).optional(),
+  images: Joi.array().items(Joi.string()).optional(), // Now expects URLs from client
 });
+
+// New endpoint for direct file upload
+exports.uploadImage = async (req, res) => {
+  try {
+    if (!req.body || !req.body.file) {
+      return res.status(400).json({ message: 'No file data provided' });
+    }
+
+    const { file, filename, contentType } = req.body;
+    
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return res.status(500).json({ message: 'Blob token not configured' });
+    }
+
+    // Convert base64 to buffer
+    const buffer = Buffer.from(file, 'base64');
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const uniqueFilename = `${timestamp}-${filename}`;
+
+    const { url } = await put(uniqueFilename, buffer, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      contentType: contentType || 'image/jpeg',
+    });
+
+    console.log('File uploaded successfully:', url);
+    res.json({ url });
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ message: 'Upload failed', error: error.message });
+  }
+};
 
 exports.createPost = async (req, res) => {
   try {
@@ -27,46 +62,12 @@ exports.createPost = async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
 
-    // Fixed file processing logic
-    let files = [];
-    
-    if (req.files) {
-      console.log('req.files:', req.files); // Debug log
-      
-      if (Array.isArray(req.files)) {
-        // When using upload.array('images')
-        files = req.files;
-      } else if (req.files.images) {
-        // When using upload.fields([{ name: 'images' }])
-        files = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
-      } else if (typeof req.files === 'object') {
-        // When using upload.single('image') or other field names
-        files = Object.values(req.files).flat();
-      }
-    }
-
-    console.log('Processed files:', files); // Debug log
-
-    // Upload files to Vercel Blob
-    const imageUrls = [];
-    if (files && files.length > 0) {
-      try {
-        const uploadPromises = files.map(file => uploadFile(file));
-        const urls = await Promise.all(uploadPromises);
-        imageUrls.push(...urls);
-        console.log('Uploaded image URLs:', imageUrls); // Debug log
-      } catch (uploadError) {
-        console.error('File upload error:', uploadError);
-        return res.status(500).json({ message: 'File upload failed', error: uploadError.message });
-      }
-    }
-
     const post = new Post({
       userId: req.user.userId,
       title: req.body.title,
       description: req.body.description,
       category: req.body.category,
-      images: imageUrls, // This will be an array of URLs or empty array
+      images: req.body.images || [], // Array of URLs uploaded by client
       hourlyRate: req.body.hourlyRate,
       availability: req.body.availability,
       serviceType: req.body.serviceType,
@@ -77,7 +78,7 @@ exports.createPost = async (req, res) => {
     });
 
     await post.save();
-    console.log('Post saved with images:', post.images); // Debug log
+    console.log('Post saved with images:', post.images);
     res.status(201).json(post);
     
   } catch (error) {
@@ -99,7 +100,6 @@ exports.getAllPosts = async (req, res) => {
           path: 'userId',
           match: { role: { $in: ['client', 'thekadar', 'small_consultant', 'large_consultant'] } }
         });
-      // Filter out posts where userId is null (didn't match the condition)
       posts = posts.filter(post => post.userId);
     } else {
       posts = await Post.find().populate('userId', 'role')
