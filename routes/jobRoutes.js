@@ -9,6 +9,6 @@ router.get('/:jobId', jobController.getJob);
 router.get('/', jobController.getAllJobs);
 router.put('/:jobId', authMiddleware, jobController.updateJob);
 router.delete('/:jobId', authMiddleware, jobController.deleteJob);
-router.get('/:userId', jobController.getUserJobs); // New endpoint for jobs
+router.get('/:userId',authMiddleware, jobController.getUserJobs); // New endpoint for jobs
 
 module.exports = router;
