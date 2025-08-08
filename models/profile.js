@@ -8,7 +8,7 @@ const profileSchema = new mongoose.Schema({
   city: { type: String, required: true },
   town: { type: String, required: true },
   address: { type: String },
-  experience: { type: Number, required: true, min: 0 }, // Fixed typo: 'experiance' → 'experience'
+  experience: { type: Number, required: true, min: 0 }, // Fixed: 'experiance' → 'experience'
   logo: { type: String },
   skills: [{ type: String }],
   features: [{ type: String }],
@@ -20,6 +20,6 @@ const profileSchema = new mongoose.Schema({
   callCount: { type: Number, default: 0 },
 });
 
-// Add 2dsphere index for geospatial queries (if needed)
+
 
 module.exports = mongoose.model('Profile', profileSchema);

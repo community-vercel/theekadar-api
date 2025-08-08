@@ -1,86 +1,102 @@
-// E:\theekadar-api\controllers\reviews.js
-const Service = require('../models/Service');
+// controllers/reviews.js
+const Review = require('../models/Review');
+const Post = require('../models/Post');
+const Profile = require('../models/profile');
 const { sendNotification } = require('../utils/pusher');
 
-const submitReview = async (req, res) => {
-  const { serviceId, rating, review } = req.body;
+exports.submitReview = async (req, res) => {
+  const { postId, rating, comment } = req.body;
 
   try {
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({ error: 'Service not found' });
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({ message: 'Invalid post ID' });
+    }
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
     }
 
-    // Check if user has a completed booking for this service
-    const booking = await Booking.findOne({
-      clientId: req.user.id,
-      serviceId,
-      status: 'completed',
-    });
-    if (!booking) {
-      return res.status(403).json({ error: 'No completed booking found for this service' });
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
     }
 
-    // Check if user already reviewed this service
-    const existingReview = service.ratings.find(
-      (r) => r.clientId.toString() === req.user.id
-    );
+    // Optionally: Check if user has a completed booking (if applicable)
+    // This requires a Booking model, which wasn’t provided
+    // If not needed, remove this check or implement it based on your requirements
+
+    // Check if user already reviewed this post
+    const existingReview = await Review.findOne({ postId, userId: req.user.id });
     if (existingReview) {
-      return res.status(400).json({ error: 'You have already reviewed this service' });
+      return res.status(400).json({ message: 'You have already reviewed this post' });
     }
 
-    service.ratings.push({
-      clientId: req.user.id,
+    const review = new Review({
+      postId,
+      userId: req.user.id,
       rating,
-      review,
+      comment,
     });
 
-    // Update average rating
-    const totalRatings = service.ratings.length;
-    const sumRatings = service.ratings.reduce((sum, r) => sum + r.rating, 0);
-    service.averageRating = sumRatings / totalRatings;
+    await review.save();
 
-    await service.save();
+    // Update profile rating
+    const userId = post.userId;
+    const posts = await Post.find({ userId });
+    const postIds = posts.map(post => post._id);
+    const reviews = await Review.find({ postId: { $in: postIds } });
+    const averageRating = reviews.length > 0 
+      ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+      : null;
+
+    await Profile.findOneAndUpdate(
+      { userId },
+      { rating: averageRating },
+      { new: true }
+    );
+
     await sendNotification(
-      service.workerId,
-      `New review (${rating}/5) for your service: ${service.category}`,
+      userId,
+      `New review (${rating}/5) for your post: ${post.title}`,
       'general'
     );
-    res.json({ message: 'Review submitted successfully' });
+
+    res.status(201).json({ message: 'Review submitted successfully', review });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-const getReviews = async (req, res) => {
-  const { serviceId } = req.params;
+exports.getReviews = async (req, res) => {
+  const { postId } = req.params;
   const { page = 1, limit = 10 } = req.query;
 
   try {
+    if (!mongoose.isValidObjectId(postId)) {
+      return res.status(400).json({ message: 'Invalid post ID' });
+    }
+
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({ error: 'Service not found' });
-    }
+    const reviews = await Review.find({ postId })
+      .populate('userId', 'name email')
+      .skip(skip)
+      .limit(limitNum)
+      .sort({ createdAt: -1 });
 
-    const totalItems = service.ratings.length;
-    const paginatedRatings = service.ratings.slice(skip, skip + limitNum);
+    const total = await Review.countDocuments({ postId });
 
-    res.json({
-      data: paginatedRatings,
+    res.status(200).json({
+      data: reviews,
       pagination: {
         currentPage: pageNum,
-        totalPages: Math.ceil(totalItems / limitNum),
-        totalItems,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
         limit: limitNum,
       },
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-module.exports = { submitReview, getReviews };

@@ -6,17 +6,6 @@ const Post = require('../models/Post');
 const { put } = require('@vercel/blob');
 
 // Validation schema for profile creation and update
-const profileSchema = Joi.object({
-  name: Joi.string().required(),
-  phone: Joi.string().optional(),
-  address: Joi.string().optional(),
-  skills: Joi.array().items(Joi.string()).optional(),
-  features: Joi.array().items(Joi.string()).optional(),
-  city: Joi.string().required(),
-  town: Joi.string().required(),
-  experiance: Joi.number().required().min(0),
-  logo: Joi.string().optional(), // Expect base64 string for logo
-});
 
 // Validation schema for near query (unchanged)
 const postSearchSchema = Joi.object({
@@ -30,6 +19,18 @@ const postSearchSchema = Joi.object({
   minHourlyRate: Joi.number().min(0).optional(),
   maxHourlyRate: Joi.number().min(0).optional(),
   availability: Joi.boolean().optional(),
+});
+// controllers/profileController.js
+const profileSchema = Joi.object({
+  name: Joi.string().required(),
+  phone: Joi.string().optional(),
+  address: Joi.string().optional(),
+  skills: Joi.array().items(Joi.string()).optional(),
+  features: Joi.array().items(Joi.string()).optional(),
+  city: Joi.string().required(),
+  town: Joi.string().required(),
+  experience: Joi.number().required().min(0), // Fixed: 'experiance' → 'experience'
+  logo: Joi.string().optional(),
 });
 
 exports.createProfile = async (req, res) => {
@@ -53,10 +54,9 @@ exports.createProfile = async (req, res) => {
   let logoUrl = '';
   if (req.body.logo) {
     try {
-      // Remove base64 prefix (e.g., "data:image/jpeg;base64,")
       const base64Data = req.body.logo.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
-      const fileName = `profiles/${Date.now()}-logo.jpg`; // Unique filename
+      const fileName = `profiles/${Date.now()}-logo.jpg`;
       const { url } = await put(fileName, buffer, {
         access: 'public',
         token: process.env.VERCEL_BLOB_TOKEN,
@@ -75,7 +75,7 @@ exports.createProfile = async (req, res) => {
       city: req.body.city,
       town: req.body.town,
       address: req.body.address,
-      experiance: req.body.experiance,
+      experience: req.body.experience, // Fixed: 'experiance' → 'experience'
       logo: logoUrl,
       skills: skills || [],
       features: features || [],
@@ -106,10 +106,9 @@ exports.updateProfile = async (req, res) => {
   let logoUrl = profile.logo;
   if (req.body.logo) {
     try {
-      // Remove base64 prefix (e.g., "data:image/jpeg;base64,")
       const base64Data = req.body.logo.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
-      const fileName = `profiles/${Date.now()}-logo.jpg`; // Unique filename
+      const fileName = `profiles/${Date.now()}-logo.jpg`;
       const { url } = await put(fileName, buffer, {
         access: 'public',
         token: process.env.VERCEL_BLOB_TOKEN,
@@ -126,7 +125,7 @@ exports.updateProfile = async (req, res) => {
     profile.address = req.body.address || profile.address;
     profile.skills = req.body.skills || profile.skills;
     profile.features = req.body.features || profile.features;
-    profile.experiance = req.body.experiance || profile.experiance;
+    profile.experience = req.body.experience || profile.experience; // Fixed: 'experiance' → 'experience'
     profile.city = req.body.city || profile.city;
     profile.town = req.body.town || profile.town;
     profile.logo = logoUrl;
