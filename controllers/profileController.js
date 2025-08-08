@@ -3,7 +3,7 @@ const Joi = require('joi');
 const User = require('../models/User');
 const Profile = require('../models/profile');
 const Post = require('../models/Post');
-const { uploadFile } = require('../utils/vercelBlob');
+const { put } = require('@vercel/blob');
 
 // Validation schema for profile creation and update
 const profileSchema = Joi.object({
@@ -12,12 +12,13 @@ const profileSchema = Joi.object({
   address: Joi.string().optional(),
   skills: Joi.array().items(Joi.string()).optional(),
   features: Joi.array().items(Joi.string()).optional(),
- city: Joi.string().required(),
+  city: Joi.string().required(),
   town: Joi.string().required(),
-  experiance: Joi.number().required().min(0), // New field: required
+  experiance: Joi.number().required().min(0),
+  logo: Joi.string().optional(), // Expect base64 string for logo
 });
 
-// Validation schema for near query
+// Validation schema for near query (unchanged)
 const postSearchSchema = Joi.object({
   city: Joi.string().optional(),
   town: Joi.string().optional(),
@@ -31,7 +32,6 @@ const postSearchSchema = Joi.object({
   availability: Joi.boolean().optional(),
 });
 
-
 exports.createProfile = async (req, res) => {
   const { error } = profileSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -42,7 +42,7 @@ exports.createProfile = async (req, res) => {
   const existingProfile = await Profile.findOne({ userId: req.user.userId });
   if (existingProfile) return res.status(400).json({ message: 'Profile already exists' });
 
-  const { skills, features, location } = req.body;
+  const { skills, features } = req.body;
   if (skills && user.role !== 'worker') {
     return res.status(403).json({ message: 'Only workers can add skills' });
   }
@@ -51,23 +51,41 @@ exports.createProfile = async (req, res) => {
   }
 
   let logoUrl = '';
-  if (req.file) logoUrl = await uploadFile(req.file);
+  if (req.body.logo) {
+    try {
+      // Remove base64 prefix (e.g., "data:image/jpeg;base64,")
+      const base64Data = req.body.logo.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const fileName = `profiles/${Date.now()}-logo.jpg`; // Unique filename
+      const { url } = await put(fileName, buffer, {
+        access: 'public',
+        token: process.env.VERCEL_BLOB_TOKEN,
+      });
+      logoUrl = url;
+    } catch (uploadError) {
+      return res.status(500).json({ message: 'Failed to upload logo', error: uploadError.message });
+    }
+  }
 
-  const profile = new Profile({
-    userId: req.user.userId,
-    name: req.body.name,
-    phone: req.body.phone,
-    city: req.body.city,
-    town: req.body.town,
-    address: req.body.address,
-    experiance: req.body.experiance,
-    logo: logoUrl,
-    skills: skills || [],
-    features: features || [],
-  });
+  try {
+    const profile = new Profile({
+      userId: req.user.userId,
+      name: req.body.name,
+      phone: req.body.phone,
+      city: req.body.city,
+      town: req.body.town,
+      address: req.body.address,
+      experiance: req.body.experiance,
+      logo: logoUrl,
+      skills: skills || [],
+      features: features || [],
+    });
 
-  await profile.save();
-  res.status(201).json(profile);
+    await profile.save();
+    res.status(201).json(profile);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to create profile', error: error.message });
+  }
 };
 
 exports.updateProfile = async (req, res) => {
@@ -85,20 +103,42 @@ exports.updateProfile = async (req, res) => {
     return res.status(403).json({ message: 'Only thekadar or consultants can add features' });
   }
 
-  profile.name = req.body.name || profile.name;
-  profile.phone = req.body.phone || profile.phone;
-  profile.address = req.body.address || profile.address;
-  profile.skills = req.body.skills || profile.skills;
-  profile.features = req.body.features || profile.features;
-  profile.experiance = req.body.experiance || profile.experiance;
-  profile.city = req.body.city || profile.city;
-  profile.town = req.body.town || profile.town;
-  if (req.file) profile.logo = await uploadFile(req.file);
+  let logoUrl = profile.logo;
+  if (req.body.logo) {
+    try {
+      // Remove base64 prefix (e.g., "data:image/jpeg;base64,")
+      const base64Data = req.body.logo.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const fileName = `profiles/${Date.now()}-logo.jpg`; // Unique filename
+      const { url } = await put(fileName, buffer, {
+        access: 'public',
+        token: process.env.VERCEL_BLOB_TOKEN,
+      });
+      logoUrl = url;
+    } catch (uploadError) {
+      return res.status(500).json({ message: 'Failed to upload logo', error: uploadError.message });
+    }
+  }
 
-  await profile.save();
-  res.json(profile);
+  try {
+    profile.name = req.body.name || profile.name;
+    profile.phone = req.body.phone || profile.phone;
+    profile.address = req.body.address || profile.address;
+    profile.skills = req.body.skills || profile.skills;
+    profile.features = req.body.features || profile.features;
+    profile.experiance = req.body.experiance || profile.experiance;
+    profile.city = req.body.city || profile.city;
+    profile.town = req.body.town || profile.town;
+    profile.logo = logoUrl;
+
+    await profile.save();
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update profile', error: error.message });
+  }
 };
 
+// Other functions remain unchanged
 exports.incrementCallCount = async (req, res) => {
   const { userId } = req.params;
 
@@ -125,6 +165,7 @@ exports.getCallCount = async (req, res) => {
 
   res.status(200).json({ userId: profile.userId, callCount: profile.callCount });
 };
+
 exports.findProfilesNear = async (req, res) => {
   try {
     const { error } = postSearchSchema.validate(req.query);
