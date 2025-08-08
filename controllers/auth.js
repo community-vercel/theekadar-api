@@ -44,7 +44,7 @@ exports.register = async (req, res) => {
 
     // Create profile
     const profile = new Profile({
-      userId: user._id,
+      userId: user._id || user.userId,
       name,
       phone,
       city: city || '', // Required field
@@ -57,9 +57,8 @@ exports.register = async (req, res) => {
     await profile.save();
 
     // Generate JWT
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    res.status(201).json({ message: 'User and profile created successfully', token });
+    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  res.status(201).json({ token, userId: user._id || user.userId });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
