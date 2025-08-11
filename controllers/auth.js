@@ -69,7 +69,7 @@ exports.forgotPassword = async (req, res) => {
 
     // Save OTP and expiration (10 minutes)
     user.resetPasswordCode = otpCode;
-    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000;
+    user.resetPasswordExpires = Date.now() + 200 * 60 * 1000;
     await user.save();
 
     // Configure Nodemailer
@@ -86,8 +86,8 @@ exports.forgotPassword = async (req, res) => {
       from: process.env.EMAIL_USER,
       to: user.email,
       subject: 'Your Password Reset Code',
-      text: `Your password reset code is: ${otpCode}. This code will expire in 10 minutes.`,
-      html: `<p>Your password reset code is:</p><h2>${otpCode}</h2><p>This code will expire in 10 minutes.</p>`,
+      text: `Your password reset code is: ${otpCode}. This code will expire in 20 hour.`,
+      html: `<p>Your password reset code is:</p><h2>${otpCode}</h2><p>This code will expire in 20 hour.</p>`,
     };
 
     await transporter.sendMail(mailOptions);
@@ -102,6 +102,12 @@ exports.verifyResetCode = async (req, res) => {
   const { email, code } = req.body;
 
   try {
+    console.log("Received Email:", email);
+console.log("Received Code:", code);
+
+
+
+
     const user = await User.findOne({
       email,
       resetPasswordCode: code,

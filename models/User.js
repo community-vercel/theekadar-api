@@ -1,4 +1,3 @@
-// models/User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -13,8 +12,11 @@ const userSchema = new mongoose.Schema({
   },
   isVerified: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
-  resetPasswordToken: { type: String }, // New field for reset token
-  resetPasswordExpires: { type: Date }, // New field for token expiration
+
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
+  resetPasswordCode: { type: String },
+  resetPasswordVerified: { type: Boolean, default: false } // ✅ Added
 });
 
 // Virtual field for Profile
@@ -25,7 +27,6 @@ userSchema.virtual('profile', {
   justOne: true,
 });
 
-// Enable virtuals in toJSON and toObject
 userSchema.set('toObject', { virtuals: true });
 userSchema.set('toJSON', { virtuals: true });
 
