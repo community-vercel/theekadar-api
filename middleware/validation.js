@@ -48,7 +48,28 @@ const updateUserSchema = Joi.object({
     coordinates: Joi.array().items(Joi.number()).length(2).optional(),
   }).optional(),
 });
+// middleware/validation.js
+const Joi = require('joi');
 
+const updateUserSchemas = Joi.object({
+  email: Joi.string().email().optional(),
+  role: Joi.string().valid('client', 'worker', 'admin', 'thekedar').optional(),
+  isVerified: Joi.boolean().optional(),
+  name: Joi.string().optional(),
+  phone: Joi.string().optional(),
+  city: Joi.string().required(),
+  town: Joi.string().required(),
+  address: Joi.string().optional(),
+  experience: Joi.number().min(0).optional(),
+  skills: Joi.array().items(Joi.string()).optional(),
+  features: Joi.array().items(Joi.string()).optional(),
+  verificationStatus: Joi.string().valid('pending', 'approved', 'rejected').optional(),
+});
+
+
+
+
+module.exports = { validate, updateUserSchema };
 const workerSchema = Joi.object({
   skills: Joi.array().items(Joi.string()).min(1).required(),
   experience: Joi.number().min(0).required(),
@@ -159,5 +180,6 @@ module.exports = {
   updateUserSchema,
    forgotPasswordSchema,
   resetPasswordSchema,
+  updateUserSchemas,
   thekedarSchema,
 };

@@ -27,11 +27,9 @@ exports.login = async (req, res) => {
   }
 };
 
-
-// Existing controllers (unchanged)
 exports.getUserProfile = async (req, res) => {
   try {
-    const profile = await Profile.findOne({ userId: req.user.id }).populate('userId', 'email role');
+    const profile = await Profile.findOne({ userId: req.user.id }).populate('userId', 'email role isVerified');
     if (!profile) return res.status(404).json({ message: 'Profile not found' });
     res.json(profile);
   } catch (error) {
@@ -69,6 +67,7 @@ exports.verifyWorker = async (req, res) => {
       { verificationStatus: status },
       { new: true }
     );
+    await User.findByIdAndUpdate(userId, { isVerified: status === 'approved' }, { new: true });
 
     res.json({ message: `Worker ${status} successfully`, verification });
   } catch (error) {
@@ -92,7 +91,7 @@ exports.searchUsersByLocation = async (req, res) => {
     if (city) query.city = new RegExp(city, 'i');
     if (town) query.town = new RegExp(town, 'i');
 
-    const profiles = await Profile.find(query).populate('userId', 'email role');
+    const profiles = await Profile.find(query).populate('userId', 'email role isVerified');
     res.json(profiles);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -101,9 +100,10 @@ exports.searchUsersByLocation = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('email role createdAt');
-    const profiles = await Profile.find().populate('userId', 'email role');
-    res.json({ users, profiles });
+    const users = await User.find().select('email role isVerified createdAt');
+    const profiles = await Profile.find().populate('userId', 'email role isVerified');
+    const verifications = await Verification.find().populate('userId', 'email');
+    res.json({ users, profiles, verifications });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -121,16 +121,15 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-// New: Update user profile by admin
 exports.updateUserByAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { name, phone, city, town, address, experience, skills, features, email, role } = req.body;
+    const { email, role, isVerified, name, phone, city, town, address, experience, skills, features, verificationStatus } = req.body;
 
-    // Update User model (email and role)
+    // Update User model
     const user = await User.findByIdAndUpdate(
       userId,
-      { email, role },
+      { email, role, isVerified },
       { new: true, runValidators: true }
     );
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -138,10 +137,28 @@ exports.updateUserByAdmin = async (req, res) => {
     // Update Profile model
     const profile = await Profile.findOneAndUpdate(
       { userId },
-      { name, phone, city, town, address, experience, skills, features },
+      { name, phone, city, town, address, experience, skills, features, verificationStatus },
       { new: true, runValidators: true }
     );
     if (!profile) return res.status(404).json({ message: 'Profile not found' });
+
+    // Update Verification model if verificationStatus is provided
+    if (verificationStatus) {
+      const verification = await Verification.findOneAndUpdate(
+        { userId },
+        { status: verificationStatus, updatedAt: Date.now() },
+        { new: true }
+      );
+      if (!verification) {
+        // Create a new verification if none exists (optional, adjust as needed)
+        await Verification.create({
+          userId,
+          documentType: 'N/A',
+          documentUrl: 'N/A',
+          status: verificationStatus,
+        });
+      }
+    }
 
     res.json({ message: 'User updated successfully', user, profile });
   } catch (error) {
