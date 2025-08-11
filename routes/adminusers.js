@@ -10,8 +10,8 @@ router.put('/profile', admin(['client', 'worker', 'admin']), validate(updateUser
 router.post('/verify-worker', admin(['admin']), verifyWorker);
 router.get('/pending-verifications', admin(['admin']), getPendingVerifications);
 router.get('/search', admin(['client', 'admin', 'thekedar']), searchUsersByLocation);
-router.get('/all', admin(['admin']), getAllUsers); // New: Get all users
-router.delete('/:userId', admin(['admin']), deleteUser); // New: Delete user
+router.get('/all', admin(['admin']), getAllUsers); 
+router.delete('/:userId', admin(['admin']), deleteUser); 
 router.post('/login', login);
 
 module.exports = router;
