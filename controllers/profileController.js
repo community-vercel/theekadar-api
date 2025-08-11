@@ -123,22 +123,50 @@ exports.updateProfile = async (req, res) => {
   }
 
   try {
+    // Update User name if provided
+    if (req.body.name) {
+      user.name = req.body.name;
+      await user.save();
+    }
+
+    // Update Profile fields
     profile.name = req.body.name || profile.name;
     profile.phone = req.body.phone || profile.phone;
     profile.address = req.body.address || profile.address;
     profile.skills = req.body.skills || profile.skills;
     profile.features = req.body.features || profile.features;
-    profile.experience = req.body.experience || profile.experience; // Fixed: 'experiance' → 'experience'
+    profile.experience = req.body.experience || profile.experience;
     profile.city = req.body.city || profile.city;
     profile.town = req.body.town || profile.town;
     profile.logo = logoUrl;
 
     await profile.save();
-    res.json(profile);
+
+    // Return merged updated data
+    const mergedProfile = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+      profileImage: profile.logo,
+      skills: profile.skills,
+      experience: profile.experience,
+      callCount: profile.callCount,
+      city: profile.city,
+      town: profile.town,
+      address: profile.address,
+      verificationStatus: profile.verificationStatus,
+    };
+
+    res.json({ message: 'Profile updated successfully', profile: mergedProfile });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update profile', error: error.message });
   }
 };
+
 
 // Other functions remain unchanged
 exports.incrementCallCount = async (req, res) => {
