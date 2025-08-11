@@ -49,7 +49,6 @@ const updateUserSchema = Joi.object({
   }).optional(),
 });
 // middleware/validation.js
-const Joi = require('joi');
 
 const updateUserSchemas = Joi.object({
   email: Joi.string().email().optional(),
