@@ -6,6 +6,8 @@ const User = require('../models/User');
 const Profile = require('../models/profile');
 const Post=require('../models/Post');
 const Review=require('../models/Review');
+const { authMiddleware } = require('../middleware/auth');
+
 const mongoose = require('mongoose');
 
 router.post('/register', authController.register);
@@ -14,7 +16,7 @@ router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-reset-code', authController.verifyResetCode);
 router.post('/reset-password', authController.resetPassword);
 // routes/authRoutes.js
-router.get('/:userId', async (req, res) => {
+router.get('/:userId',authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -27,36 +29,24 @@ router.get('/:userId', async (req, res) => {
       .populate({
         path: 'profile',
         model: 'Profile',
-        select: 'logo skills experience callCount city town address verificationStatus', // Use 'experience'
+        select: 'logo skills experience callCount city town address verificationStatus',
       });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const posts = await Post.find({ userId });
-    const postIds = posts.map(post => post._id);
-    const reviews = await Review.find({ postId: { $in: postIds } });
-
-    let averageRating = null;
-    if (reviews.length > 0) {
-      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-      averageRating = (totalRating / reviews.length).toFixed(1);
-    }
-
     const response = {
-      _id: user._id,
+      _id: user._id || user.userId,
       name: user.name,
       email: user.email,
       phone: user.phone,
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
-      
       profileImage: user.profile ? user.profile.logo : null,
-      rating: averageRating,
       skills: user.profile ? user.profile.skills : null,
-      experience: user.profile ? user.profile.experience : null, // Use 'experience'
+      experience: user.profile ? user.profile.experience : null,
       callCount: user.profile ? user.profile.callCount : 0,
       city: user.profile ? user.profile.city : null,
       town: user.profile ? user.profile.town : null,
