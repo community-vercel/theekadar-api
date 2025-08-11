@@ -117,6 +117,9 @@ exports.updateProfile = async (req, res) => {
         token: process.env.VERCEL_BLOB_TOKEN,
       });
       logoUrl = url;
+
+      // ✅ Save image in User model as well
+      user.profileImage = logoUrl;
     } catch (uploadError) {
       return res.status(500).json({ message: 'Failed to upload logo', error: uploadError.message });
     }
@@ -126,8 +129,8 @@ exports.updateProfile = async (req, res) => {
     // Update User name if provided
     if (req.body.name) {
       user.name = req.body.name;
-      await user.save();
     }
+    await user.save();
 
     // Update Profile fields
     profile.name = req.body.name || profile.name;
@@ -151,7 +154,7 @@ exports.updateProfile = async (req, res) => {
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
-      profileImage: profile.logo,
+      profileImage: user.profileImage, // ✅ from User now
       skills: profile.skills,
       experience: profile.experience,
       callCount: profile.callCount,
