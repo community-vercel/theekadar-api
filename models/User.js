@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['client', 'worker', 'thekadar', 'contractor', 'consultant'], 
+    enum: ['client', 'worker', 'thekadar', 'contractor', 'consultant','admin'], 
     required: true 
   },
   profileImage: { type: String },
