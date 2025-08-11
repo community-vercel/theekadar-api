@@ -10,6 +10,8 @@ const morgan = require('morgan');
 const compression = require('compression');
 const csurf = require('csurf');
 const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/adminusers');
+
 const verificationRoutes = require('./routes/verificationRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const cityRoutes = require('./routes/city'); // Assuming you have a cityRoutes file
@@ -77,6 +79,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/jobs', require('./routes/jobRoutes'));
 
+app.use('/api/admin', adminRoutes);
 
 
 app.use('/api/posts', postRoutes);
