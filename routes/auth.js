@@ -60,6 +60,48 @@ router.get('/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+router.get('/client/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    // Find the user directly
+    const user = await User.findById(userId).select(
+      'name email phone role isVerified createdAt'
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Build the response
+    const response = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      profileImage:user.profileImage,
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+    };
+
+    res
+      .status(200)
+      .json({ message: 'User details retrieved successfully', user: response });
+  } catch (error) {
+    console.error('Error:', error);
+    res
+      .status(500)
+      .json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+
 
 
 module.exports = router;
