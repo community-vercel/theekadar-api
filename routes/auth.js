@@ -8,6 +8,8 @@ const Post=require('../models/Post');
 const Review=require('../models/Review');
 const { authMiddleware } = require('../middleware/auth');
 
+const { put } = require('@vercel/blob'); // For image uploads
+
 const mongoose = require('mongoose');
 
 router.post('/register', authController.register);
@@ -60,6 +62,7 @@ router.get('/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+
 router.get('/client/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -77,7 +80,7 @@ router.get('/client/:userId', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    
+
     // Build the response
     const response = {
       _id: user._id,
@@ -100,6 +103,68 @@ router.get('/client/:userId', authMiddleware, async (req, res) => {
       .json({ message: 'Server error', error: error.message });
   }
 });
+
+
+// Update user info
+router.put('/client/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Upload profile image if provided (base64)
+    let profileImageUrl = user.profileImage;
+    if (req.body.profileImage) {
+      try {
+        const base64Data = req.body.profileImage.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const fileName = `users/${Date.now()}-profile.jpg`;
+        const { url } = await put(fileName, buffer, {
+          access: 'public',
+          token: process.env.VERCEL_BLOB_TOKEN,
+        });
+        profileImageUrl = url;
+      } catch (uploadError) {
+        return res.status(500).json({ message: 'Failed to upload profile image', error: uploadError.message });
+      }
+    }
+
+    // Update fields
+    user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
+    user.phone = req.body.phone || user.phone;
+    user.role = req.body.role || user.role;
+    user.isVerified = req.body.isVerified !== undefined ? req.body.isVerified : user.isVerified;
+    user.profileImage = profileImageUrl;
+
+    await user.save();
+
+    res.status(200).json({
+      message: 'User updated successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+        profileImage: user.profileImage
+      }
+    });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 
 
 
