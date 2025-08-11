@@ -15,7 +15,7 @@ const registerSchema = Joi.object({
   password: Joi.string().min(6).required(),
   name: Joi.string().required(), // New field: required
   phone: Joi.string().optional(), // New field: optional
-  role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant').required(),
+  role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant','admin').required(),
 });
 
 // Validation schema for login
