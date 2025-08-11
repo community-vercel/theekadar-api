@@ -91,6 +91,7 @@ exports.createProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to create profile', error: error.message });
   }
 };
+
 exports.updateProfile = async (req, res) => {
   const { error } = profileSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -169,6 +170,7 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to update profile', error: error.message });
   }
 };
+
 
 
 // Other functions remain unchanged
