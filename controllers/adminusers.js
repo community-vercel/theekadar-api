@@ -27,6 +27,8 @@ exports.login = async (req, res) => {
   }
 };
 
+
+// Existing controllers (unchanged)
 exports.getUserProfile = async (req, res) => {
   try {
     const profile = await Profile.findOne({ userId: req.user.id }).populate('userId', 'email role');
@@ -37,7 +39,6 @@ exports.getUserProfile = async (req, res) => {
   }
 };
 
-// Update user profile
 exports.updateUserProfile = async (req, res) => {
   try {
     const { name, phone, city, town, address, experience, skills, features } = req.body;
@@ -53,10 +54,9 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
-// Verify worker
 exports.verifyWorker = async (req, res) => {
   try {
-    const { userId, status } = req.body; // status: 'approved' or 'rejected'
+    const { userId, status } = req.body;
     const verification = await Verification.findOneAndUpdate(
       { userId },
       { status, updatedAt: Date.now() },
@@ -64,7 +64,6 @@ exports.verifyWorker = async (req, res) => {
     );
     if (!verification) return res.status(404).json({ message: 'Verification not found' });
 
-    // Update profile verification status
     await Profile.findOneAndUpdate(
       { userId },
       { verificationStatus: status },
@@ -77,7 +76,6 @@ exports.verifyWorker = async (req, res) => {
   }
 };
 
-// Get pending verifications
 exports.getPendingVerifications = async (req, res) => {
   try {
     const verifications = await Verification.find({ status: 'pending' }).populate('userId', 'email');
@@ -87,7 +85,6 @@ exports.getPendingVerifications = async (req, res) => {
   }
 };
 
-// Search users by location
 exports.searchUsersByLocation = async (req, res) => {
   try {
     const { city, town } = req.query;
@@ -102,7 +99,6 @@ exports.searchUsersByLocation = async (req, res) => {
   }
 };
 
-// New: Get all users (for admin dashboard)
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select('email role createdAt');
@@ -113,7 +109,6 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// New: Delete user
 exports.deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -121,6 +116,34 @@ exports.deleteUser = async (req, res) => {
     await Profile.findOneAndDelete({ userId });
     await Verification.findOneAndDelete({ userId });
     res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// New: Update user profile by admin
+exports.updateUserByAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, phone, city, town, address, experience, skills, features, email, role } = req.body;
+
+    // Update User model (email and role)
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { email, role },
+      { new: true, runValidators: true }
+    );
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Update Profile model
+    const profile = await Profile.findOneAndUpdate(
+      { userId },
+      { name, phone, city, town, address, experience, skills, features },
+      { new: true, runValidators: true }
+    );
+    if (!profile) return res.status(404).json({ message: 'Profile not found' });
+
+    res.json({ message: 'User updated successfully', user, profile });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
