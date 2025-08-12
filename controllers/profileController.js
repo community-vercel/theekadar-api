@@ -208,31 +208,81 @@ exports.findProfilesNear = async (req, res) => {
     const { error } = postSearchSchema.validate(req.query);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const { city } = req.query;
+    const { city, town, skills, category } = req.query;
     console.log('Query parameters:', req.query);
 
+    // Build dynamic match stage
     let matchStage = {};
-    if (city) matchStage['profile.city'] = { $regex: `^${city}$`, $options: 'i' };
+    if (city) {
+      matchStage['profile.city'] = { $regex: city, $options: 'i' }; // Partial match
+    }
+    if (town) {
+      matchStage['profile.town'] = { $regex: town, $options: 'i' }; // Partial match for town
+    }
+    if (skills) {
+      const skillArray = Array.isArray(skills) ? skills : skills.split(',').map(s => s.trim());
+      matchStage['profile.skills'] = { $in: skillArray.map(s => new RegExp(s, 'i')) };
+    }
+    if (category) {
+      matchStage['category'] = { $regex: category, $options: 'i' }; // Match post category
+    }
+
+    // Ensure at least one search parameter is provided
+    if (Object.keys(matchStage).length === 0) {
+      return res.status(400).json({ message: 'At least one search parameter (city, town, skills, or category) is required' });
+    }
 
     const posts = await Post.aggregate([
-      { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'user' } },
-      { $unwind: '$user' },
-      { $lookup: { from: 'profiles', localField: 'userId', foreignField: 'userId', as: 'profile' } },
-      { $unwind: '$profile' },
+      // Lookup for users
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }, // Allow posts without users
+      // Lookup for profiles
+      {
+        $lookup: {
+          from: 'profiles',
+          localField: 'userId',
+          foreignField: 'userId',
+          as: 'profile',
+        },
+      },
+      { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }, // Allow posts without profiles
       { $match: matchStage },
+      // Project relevant fields
       {
         $project: {
           _id: 1,
           title: 1,
           description: 1,
           category: 1,
-          user: { _id: '$user._id', name: '$user.name', role: '$user.role' },
-          profile: { city: '$profile.city', verificationStatus: '$profile.verificationStatus' }
-        }
-      }
+          user: {
+            _id: '$user._id',
+            name: '$user.name',
+            role: '$user.role',
+          },
+          profile: {
+            city: '$profile.city',
+            town: '$profile.town',
+            skills: '$profile.skills',
+            verificationStatus: '$profile.verificationStatus',
+          },
+        },
+      },
+      // Optionally sort results
+      { $sort: { createdAt: -1 } }, // Sort by newest first
     ]);
 
-    console.log('Found posts:', posts);
+    console.log('Found posts:', posts.length);
+    if (posts.length === 0) {
+      return res.status(404).json({ message: 'No posts found matching the criteria' });
+    }
+
     res.json(posts);
   } catch (err) {
     console.error('Error:', err);
