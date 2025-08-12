@@ -12,6 +12,7 @@ const postSearchSchema = Joi.object({
   city: Joi.string().optional(),
   town: Joi.string().optional(),
   address: Joi.string().optional(),
+  skills:Joi.string().optional(),
   role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant').optional(),
   category: Joi.string().optional(),
   serviceType: Joi.string().valid('general', 'specialized', 'emergency', 'long_term').optional(),
