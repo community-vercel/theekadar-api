@@ -285,7 +285,7 @@ exports.findProfilesNear = async (req, res) => {
             verificationStatus: '$profile.verificationStatus',
             profileImage: '$profile.logo', // Include profile image
           },
-          averageRating: {
+          rating: {
             $cond: {
               if: { $eq: [{ $size: '$reviews' }, 0] }, // Check if reviews array is empty
               then: null,
