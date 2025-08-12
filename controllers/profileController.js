@@ -265,27 +265,14 @@ exports.findProfilesNear = async (req, res) => {
         },
       },
       { $match: matchStage },
-      // Group to calculate average rating and collect reviews
-      {
-        $group: {
-          _id: '$_id',
-          title: { $first: '$title' },
-          description: { $first: '$description' },
-          category: { $first: '$category' },
-          createdAt: { $first: '$createdAt' },
-          user: { $first: '$user' },
-          profile: { $first: '$profile' },
-          reviews: { $push: '$reviews' },
-          averageRating: { $avg: '$reviews.rating' }, // Calculate average rating
-        },
-      },
-      // Project relevant fields
+      // Project relevant fields and compute average rating
       {
         $project: {
           _id: 1,
           title: 1,
           description: 1,
           category: 1,
+          createdAt: 1,
           user: {
             _id: '$user._id',
             name: '$user.name',
@@ -296,25 +283,26 @@ exports.findProfilesNear = async (req, res) => {
             town: '$profile.town',
             skills: '$profile.skills',
             verificationStatus: '$profile.verificationStatus',
+            logo: '$profile.logo', // Include profile image
           },
-          averageRating: { $ifNull: ['$averageRating', null] }, // Handle cases with no reviews
+          averageRating: {
+            $cond: {
+              if: { $eq: [{ $size: '$reviews' }, 0] }, // Check if reviews array is empty
+              then: null,
+              else: { $avg: '$reviews.rating' }, // Calculate average rating
+            },
+          },
           reviews: {
             $cond: {
-              if: { $eq: ['$reviews', [[]]] }, // Check if reviews array is empty
+              if: { $eq: [{ $size: '$reviews' }, 0] }, // Check if reviews array is empty
               then: [],
-              else: {
-                $reduce: {
-                  input: '$reviews',
-                  initialValue: [],
-                  in: { $concatArrays: ['$$value', '$$this'] }, // Flatten nested reviews array
-                },
-              },
+              else: '$reviews', // Include all reviews
             },
           },
         },
       },
-      // Optionally sort results
-      { $sort: { createdAt: -1 } }, // Sort by newest first
+      // Sort by newest first
+      { $sort: { createdAt: -1 } },
     ]);
 
     console.log('Found posts:', posts.length);
