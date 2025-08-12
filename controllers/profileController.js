@@ -254,6 +254,7 @@ exports.findProfilesNear = async (req, res) => {
           as: 'profile',
         },
       },
+      
       { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }, // Allow posts without profiles
       // Lookup for reviews
       {
