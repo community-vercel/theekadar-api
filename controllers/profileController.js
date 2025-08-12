@@ -3,6 +3,7 @@ const Joi = require('joi');
 const User = require('../models/User');
 const Profile = require('../models/profile');
 const Post = require('../models/Post');
+const Review=require('../models/Review');
 const { put } = require('@vercel/blob');
 
 // Validation schema for profile creation and update
@@ -254,7 +255,30 @@ exports.findProfilesNear = async (req, res) => {
         },
       },
       { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }, // Allow posts without profiles
+      // Lookup for reviews
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'postId',
+          as: 'reviews',
+        },
+      },
       { $match: matchStage },
+      // Group to calculate average rating and collect reviews
+      {
+        $group: {
+          _id: '$_id',
+          title: { $first: '$title' },
+          description: { $first: '$description' },
+          category: { $first: '$category' },
+          createdAt: { $first: '$createdAt' },
+          user: { $first: '$user' },
+          profile: { $first: '$profile' },
+          reviews: { $push: '$reviews' },
+          averageRating: { $avg: '$reviews.rating' }, // Calculate average rating
+        },
+      },
       // Project relevant fields
       {
         $project: {
@@ -272,6 +296,20 @@ exports.findProfilesNear = async (req, res) => {
             town: '$profile.town',
             skills: '$profile.skills',
             verificationStatus: '$profile.verificationStatus',
+          },
+          averageRating: { $ifNull: ['$averageRating', null] }, // Handle cases with no reviews
+          reviews: {
+            $cond: {
+              if: { $eq: ['$reviews', [[]]] }, // Check if reviews array is empty
+              then: [],
+              else: {
+                $reduce: {
+                  input: '$reviews',
+                  initialValue: [],
+                  in: { $concatArrays: ['$$value', '$$this'] }, // Flatten nested reviews array
+                },
+              },
+            },
           },
         },
       },
