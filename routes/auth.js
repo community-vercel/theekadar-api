@@ -73,7 +73,7 @@ router.get('/client/:userId', authMiddleware, async (req, res) => {
 
     // Find the user directly
     const user = await User.findById(userId).select(
-      'name email phone role isVerified createdAt'
+      'name email phone role isVerified profileImage createdAt'
     );
 
     if (!user) {
@@ -88,7 +88,7 @@ router.get('/client/:userId', authMiddleware, async (req, res) => {
       email: user.email,
       phone: user.phone,
       role: user.role,
-      profileImage:user.profileImage,
+      profileImage:user.profileImage || user.logo,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
     };
