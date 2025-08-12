@@ -283,7 +283,7 @@ exports.findProfilesNear = async (req, res) => {
             town: '$profile.town',
             skills: '$profile.skills',
             verificationStatus: '$profile.verificationStatus',
-            logo: '$profile.logo', // Include profile image
+            profileImage: '$profile.logo', // Include profile image
           },
           averageRating: {
             $cond: {

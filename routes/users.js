@@ -5,8 +5,6 @@ const { getUserProfile, updateUserProfile, verifyWorker, getPendingVerifications
 const { validate, updateUserSchema } = require('../middleware/validation');
 const auth = require('../middleware/auth');
 
-
-
 router.get('/profile', auth(['client', 'worker', 'admin']), getUserProfile);
 router.put('/profile', auth(['client', 'worker', 'admin']), validate(updateUserSchema), updateUserProfile);
 router.post('/verify-worker', auth(['admin']), verifyWorker);
