@@ -1,10 +1,8 @@
-// controllers/users.js
 const Profile = require('../models/profile');
 const Verification = require('../models/Verification');
-const User = require('../models/User'); // Assuming a User model exists
+const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-// Get user profile
 
 exports.login = async (req, res) => {
   try {
@@ -55,22 +53,46 @@ exports.updateUserProfile = async (req, res) => {
 exports.verifyWorker = async (req, res) => {
   try {
     const { userId, status } = req.body;
+    if (!userId || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (user.role === 'client') {
+      return res.status(400).json({ message: 'Verification not applicable for client role' });
+    }
     const verification = await Verification.findOneAndUpdate(
       { userId },
       { status, updatedAt: Date.now() },
-      { new: true }
+      { new: true, upsert: true, lean: true }
     );
-    if (!verification) return res.status(404).json({ message: 'Verification not found' });
-
-    await Profile.findOneAndUpdate(
+    const profile = await Profile.findOneAndUpdate(
       { userId },
       { verificationStatus: status },
-      { new: true }
+      { new: true, lean: true }
     );
-    await User.findByIdAndUpdate(userId, { isVerified: status === 'approved' }, { new: true });
-
-    res.json({ message: `Worker ${status} successfully`, verification });
+    if (!profile) {
+      return res.status(404).json({ message: 'Profile not found for user' });
+    }
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { isVerified: status === 'approved' },
+      { new: true, lean: true }
+    );
+    res.json({
+      message: `Worker ${status} successfully`,
+      user: updatedUser,
+      profile,
+      verification,
+    });
   } catch (error) {
+    console.error('Error verifying worker:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -100,10 +122,28 @@ exports.searchUsersByLocation = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('email role isVerified createdAt');
-    const profiles = await Profile.find().populate('userId', 'email role isVerified');
-    const verifications = await Verification.find().populate('userId', 'email');
-    res.json({ users, profiles, verifications });
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const skip = (page - 1) * pageSize;
+
+    const users = await User.find({ role: { $ne: 'admin' } })
+      .select('email role isVerified createdAt')
+      .skip(skip)
+      .limit(pageSize);
+
+    const totalUsers = await User.countDocuments({ role: { $ne: 'admin' } });
+    const totalPages = Math.ceil(totalUsers / pageSize);
+
+    const profiles = await Profile.find({ 'userId.role': { $ne: 'admin' } }).populate('userId', 'email role isVerified');
+    const verifications = await Verification.find({ 'userId.role': { $ne: 'admin' } }).populate('userId', 'email');
+
+    res.json({
+      users,
+      profiles,
+      verifications,
+      totalPages,
+      currentPage: page,
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -124,44 +164,101 @@ exports.deleteUser = async (req, res) => {
 exports.updateUserByAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { email, role, isVerified, name, phone, city, town, address, experience, skills, features, verificationStatus } = req.body;
+    const {
+      email,
+      role,
+      isVerified,
+      name,
+      phone,
+      city,
+      town,
+      address,
+      experience,
+      skills,
+      features,
+      verificationStatus,
+    } = req.body;
 
-    // Update User model
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { email, role, isVerified },
-      { new: true, runValidators: true }
-    );
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    // Update Profile model
-    const profile = await Profile.findOneAndUpdate(
-      { userId },
-      { name, phone, city, town, address, experience, skills, features, verificationStatus },
-      { new: true, runValidators: true }
-    );
-    if (!profile) return res.status(404).json({ message: 'Profile not found' });
-
-    // Update Verification model if verificationStatus is provided
-    if (verificationStatus) {
-      const verification = await Verification.findOneAndUpdate(
-        { userId },
-        { status: verificationStatus, updatedAt: Date.now() },
-        { new: true }
-      );
-      if (!verification) {
-        // Create a new verification if none exists (optional, adjust as needed)
-        await Verification.create({
-          userId,
-          documentType: 'N/A',
-          documentUrl: 'N/A',
-          status: verificationStatus,
-        });
-      }
+    if (!userId || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
     }
 
-    res.json({ message: 'User updated successfully', user, profile });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    const validRoles = ['client', 'worker', 'admin', 'thekedar'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+    }
+
+    const validStatuses = ['pending', 'approved', 'rejected'];
+    if (verificationStatus && !validStatuses.includes(verificationStatus)) {
+      return res.status(400).json({ message: `Invalid verification status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    const user = await User.findById(userId).lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const currentRole = user.role;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { email, role, isVerified: isVerified ?? false },
+      { new: true, runValidators: true, lean: true }
+    );
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    let profile = null;
+    if (role !== 'client') {
+      if (!name) {
+        return res.status(400).json({ message: 'Name is required for non-client roles' });
+      }
+      profile = await Profile.findOneAndUpdate(
+        { userId },
+        {
+          name,
+          phone,
+          city,
+          town,
+          address,
+          experience,
+          skills: skills || [],
+          features: features || [],
+          verificationStatus: verificationStatus || 'pending',
+        },
+        { new: true, runValidators: true, upsert: true, lean: true }
+      );
+    } else {
+      await Profile.findOneAndDelete({ userId });
+    }
+
+    if (verificationStatus && role !== 'client') {
+      await Verification.findOneAndUpdate(
+        { userId },
+        { status: verificationStatus, updatedAt: Date.now() },
+        { new: true, upsert: true, lean: true }
+      );
+    } else if (role === 'client' || currentRole === 'client') {
+      await Verification.findOneAndDelete({ userId });
+    }
+
+    res.json({
+      message: 'User updated successfully',
+      user: updatedUser,
+      profile: role !== 'client' ? profile : null,
+    });
   } catch (error) {
+    console.error('Error updating user:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
