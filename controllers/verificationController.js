@@ -86,9 +86,6 @@ exports.uploadVerification = async (req, res) => {
     });
   }
 };
-
-
-
 exports.checkVerificationStatus = async (req, res) => {
   try {
     const { userId } = req.query;
