@@ -69,15 +69,23 @@ exports.uploadVerification = async (req, res) => {
       });
     }
 
-    // Generate file name with extension
+    // Extract file extension
     const originalFileName = file.name || `unnamed-${documentType}`;
-    const ext = originalFileName.includes('.')
-      ? '.' + originalFileName.split('.').pop()
-      : '';
-    const baseName = originalFileName.split('.').slice(0, -1).join('.') || `user-${userId}-${documentType}`;
-    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, '') || `user-${userId}-${documentType}`;
-    const fileName = `verification/${Date.now()}-${sanitizedBaseName}${ext}`;
+    const extension = originalFileName.split('.').pop().toLowerCase();
+    const validExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+    if (!validExtensions.includes(extension)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file extension. Only jpg, jpeg, png, or pdf are allowed',
+      });
+    }
 
+    // Generate file name with extension
+    const baseName = originalFileName.split('.').slice(0, -1).join('.'); // Handle multiple dots
+    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, '') || `user-${userId}-${documentType}`;
+    const fileName = `verification/${Date.now()}-${sanitizedBaseName}.${extension}`;
+
+    // Log file name for debugging
     console.log('Original file name:', originalFileName);
     console.log('Sanitized file name:', fileName);
 
