@@ -51,11 +51,35 @@ exports.uploadVerification = async (req, res) => {
 
     const file = req.files.document;
 
+    // Validate file type
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file type. Only JPEG, PNG, or PDF are allowed',
+      });
+    }
+
+    // Validate file size (e.g., 5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      return res.status(400).json({
+        success: false,
+        message: 'File size exceeds 5MB limit',
+      });
+    }
+
     // Generate file name without extension
-    const originalFileName = file.name;
-    const fileNameWithoutExtension = `verification/${Date.now()}-${originalFileName.split('.')[0]}`;
+    const originalFileName = file.name || 'unnamed';
+    const baseName = originalFileName.split('.').slice(0, -1).join('.'); // Handle multiple dots
+    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, ''); // Sanitize to remove special characters
+    const fileNameWithoutExtension = `verification/${Date.now()}-${sanitizedBaseName || 'document'}`;
 
     // Upload to Vercel Blob
+    if (!process.env.VERCEL_BLOB_TOKEN) {
+      throw new Error('Vercel Blob token is not configured');
+    }
+
     const { url } = await put(fileNameWithoutExtension, file.data, {
       access: 'public',
       token: process.env.VERCEL_BLOB_TOKEN,
@@ -86,6 +110,7 @@ exports.uploadVerification = async (req, res) => {
     });
   }
 };
+
 exports.checkVerificationStatus = async (req, res) => {
   try {
     const { userId } = req.query;
