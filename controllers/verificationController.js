@@ -13,13 +13,7 @@ exports.uploadVerification = async (req, res) => {
     // Validate fields
     
 
-    // Validate userId
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid user ID format',
-      });
-    }
+    
 
     // Validate documentType
     const validDocumentTypes = ['id', 'passport', 'license'];
