@@ -210,28 +210,38 @@ exports.findProfilesNear = async (req, res) => {
     const { error } = postSearchSchema.validate(req.query);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const { city, town, skills, category } = req.query;
+    const { city, town, skills, category, name } = req.query;
     console.log('Query parameters:', req.query);
 
     // Build dynamic match stage
     let matchStage = {};
+    
     if (city) {
       matchStage['profile.city'] = { $regex: city, $options: 'i' }; // Partial match
     }
+    
     if (town) {
       matchStage['profile.town'] = { $regex: town, $options: 'i' }; // Partial match for town
     }
+    
     if (skills) {
       const skillArray = Array.isArray(skills) ? skills : skills.split(',').map(s => s.trim());
       matchStage['profile.skills'] = { $in: skillArray.map(s => new RegExp(s, 'i')) };
     }
+    
     if (category) {
       matchStage['category'] = { $regex: category, $options: 'i' }; // Match post category
+    }
+    
+    if (name) {
+      matchStage['user.name'] = { $regex: name, $options: 'i' }; // Partial match for user name
     }
 
     // Ensure at least one search parameter is provided
     if (Object.keys(matchStage).length === 0) {
-      return res.status(400).json({ message: 'At least one search parameter (city, town, skills, or category) is required' });
+      return res.status(400).json({ 
+        message: 'At least one search parameter (city, town, skills, category, or name) is required' 
+      });
     }
 
     const posts = await Post.aggregate([
@@ -245,6 +255,7 @@ exports.findProfilesNear = async (req, res) => {
         },
       },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }, // Allow posts without users
+      
       // Lookup for profiles
       {
         $lookup: {
@@ -254,9 +265,8 @@ exports.findProfilesNear = async (req, res) => {
           as: 'profile',
         },
       },
-      
-
       { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } }, // Allow posts without profiles
+      
       // Lookup for reviews
       {
         $lookup: {
@@ -266,7 +276,10 @@ exports.findProfilesNear = async (req, res) => {
           as: 'reviews',
         },
       },
+      
+      // Apply the match stage after all lookups are complete
       { $match: matchStage },
+      
       // Project relevant fields and compute average rating
       {
         $project: {
@@ -303,6 +316,7 @@ exports.findProfilesNear = async (req, res) => {
           },
         },
       },
+      
       // Sort by newest first
       { $sort: { createdAt: -1 } },
     ]);
