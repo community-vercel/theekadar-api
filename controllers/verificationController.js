@@ -7,16 +7,11 @@ const mongoose = require('mongoose');
 
 exports.uploadVerification = async (req, res) => {
   try {
-    
+
     const { userId, documentType, document } = req.body;
 
     // Validate fields
-    if (!userId || !documentType || !document) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: userId, documentType, and document are required',
-      });
-    }
+    
 
     // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
