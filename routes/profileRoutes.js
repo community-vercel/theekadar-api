@@ -14,7 +14,7 @@ router.post('/call/:userId', authMiddleware, profileController.incrementCallCoun
 router.get('/call/:userId', authMiddleware, profileController.getCallCount);
 router.get('/near', authMiddleware, profileController.findProfilesNear); // New endpoint
 // GET /api/profile/exists/:userId
-router.get('/exists/:userId', async (req, res) => {
+router.get('/exists/:userId',authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     
