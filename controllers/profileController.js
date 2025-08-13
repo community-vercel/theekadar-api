@@ -318,3 +318,4 @@ exports.findProfilesNear = async (req, res) => {
     res.status(500).json({ message: 'Error performing query', error: err.message });
   }
 };
+
