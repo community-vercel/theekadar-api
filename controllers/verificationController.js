@@ -3,15 +3,17 @@ const Verification = require('../models/Verification');
 const { put } = require('@vercel/blob');
 const mongoose = require('mongoose');
 
+// controllers/verificationController.js
+
 exports.uploadVerification = async (req, res) => {
   try {
-    const { userId, documentType } = req.body;
+    const { userId, documentType, document } = req.body;
 
     // Validate fields
-    if (!userId || !documentType) {
+    if (!userId || !documentType || !document) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: userId and documentType are required',
+        message: 'Missing required fields: userId, documentType, and document are required',
       });
     }
 
@@ -41,56 +43,56 @@ exports.uploadVerification = async (req, res) => {
       });
     }
 
-    // Check file
-    if (!req.files || !req.files.document) {
+    // Parse Base64 string
+    const matches = document.match(/^data:(image\/jpeg|image\/png|application\/pdf);base64,(.+)$/);
+    if (!matches) {
       return res.status(400).json({
         success: false,
-        message: 'No document uploaded',
+        message: 'Invalid Base64 string format. Must include data URI scheme (e.g., data:image/jpeg;base64,...)',
       });
     }
 
-    const file = req.files.document;
+    const mimeType = matches[1];
+    const base64Data = matches[2];
 
-    // Validate file type
+    // Validate MIME type
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (!allowedMimeTypes.includes(file.mimetype)) {
+    if (!allowedMimeTypes.includes(mimeType)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid file type. Only JPEG, PNG, or PDF are allowed',
       });
     }
 
+    // Decode Base64 to buffer
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+
     // Validate file size (5MB limit)
     const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
+    if (fileBuffer.length > maxSize) {
       return res.status(400).json({
         success: false,
         message: 'File size exceeds 5MB limit',
       });
     }
 
-    // Extract file extension
-    const originalFileName = file.name || `unnamed-${documentType}`;
-    const extension = originalFileName.split('.').pop().toLowerCase();
-    const validExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
-    if (!validExtensions.includes(extension)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid file extension. Only jpg, jpeg, png, or pdf are allowed',
-      });
-    }
+    // Determine file extension from MIME type
+    const mimeToExtension = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'application/pdf': 'pdf',
+    };
+    const extension = mimeToExtension[mimeType];
 
     // Generate file name with extension
-    const baseName = originalFileName.split('.').slice(0, -1).join('.'); // Handle multiple dots
-    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, '') || `user-${userId}-${documentType}`;
+    const sanitizedBaseName = `user-${userId}-${documentType}`;
     const fileName = `verification/${Date.now()}-${sanitizedBaseName}.${extension}`;
 
     // Log file name for debugging
-    console.log('Original file name:', originalFileName);
-    console.log('Sanitized file name:', fileName);
+    console.log('Generated file name:', fileName);
 
     // Upload to Vercel Blob
-    const { url } = await put(fileName, file.data, {
+    const { url } = await put(fileName, fileBuffer, {
       access: 'public',
       token: process.env.VERCEL_BLOB_TOKEN,
     });
@@ -120,7 +122,6 @@ exports.uploadVerification = async (req, res) => {
     });
   }
 };
-
 
 exports.checkVerificationStatus = async (req, res) => {
   try {
