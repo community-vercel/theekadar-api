@@ -69,20 +69,20 @@ exports.uploadVerification = async (req, res) => {
       });
     }
 
-    // Generate file name without extension
+    // Generate file name with extension
     const originalFileName = file.name || `unnamed-${documentType}`;
-    const baseName = originalFileName.split('.').slice(0, -1).join('.'); // Handle multiple dots
+    const ext = originalFileName.includes('.')
+      ? '.' + originalFileName.split('.').pop()
+      : '';
+    const baseName = originalFileName.split('.').slice(0, -1).join('.') || `user-${userId}-${documentType}`;
     const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, '') || `user-${userId}-${documentType}`;
-    const fileNameWithoutExtension = `verification/${Date.now()}-${sanitizedBaseName}`;
+    const fileName = `verification/${Date.now()}-${sanitizedBaseName}${ext}`;
 
-    // Log file name for debugging
     console.log('Original file name:', originalFileName);
-    console.log('Sanitized file name:', fileNameWithoutExtension);
+    console.log('Sanitized file name:', fileName);
 
     // Upload to Vercel Blob
-    
-
-    const { url } = await put(fileNameWithoutExtension, file.data, {
+    const { url } = await put(fileName, file.data, {
       access: 'public',
       token: process.env.VERCEL_BLOB_TOKEN,
     });
@@ -112,7 +112,6 @@ exports.uploadVerification = async (req, res) => {
     });
   }
 };
-
 
 
 exports.checkVerificationStatus = async (req, res) => {
