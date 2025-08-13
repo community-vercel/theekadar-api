@@ -10,6 +10,7 @@ const { put } = require('@vercel/blob');
 
 // Validation schema for near query (unchanged)
 const postSearchSchema = Joi.object({
+  name:Joi.string().optional(),
   city: Joi.string().optional(),
   town: Joi.string().optional(),
   address: Joi.string().optional(),
