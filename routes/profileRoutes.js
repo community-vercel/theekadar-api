@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Profile = require('../models/profile');
 const Post = require('../models/Post');
 const { authMiddleware } = require('../middleware/auth');
+const mongoose = require('mongoose');
 
 
 router.post('/create', authMiddleware, profileController.createProfile);
