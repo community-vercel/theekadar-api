@@ -120,15 +120,16 @@ exports.searchUsersByLocation = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 exports.getAllUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
 
+    // Fetch users sorted by createdAt in descending order (latest first)
     const users = await User.find({ role: { $ne: 'admin' } })
       .select('email role isVerified createdAt')
+      .sort({ createdAt: -1 }) // Sort by createdAt in descending order
       .skip(skip)
       .limit(pageSize)
       .lean();
@@ -154,8 +155,7 @@ exports.getAllUsers = async (req, res) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
+  }};
 
 // Delete user
 exports.deleteUser = async (req, res) => {
