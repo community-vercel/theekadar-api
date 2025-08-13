@@ -60,7 +60,7 @@ exports.uploadVerification = async (req, res) => {
       });
     }
 
-    // Validate file size (e.g., 5MB limit)
+    // Validate file size (5MB limit)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       return res.status(400).json({
@@ -70,15 +70,21 @@ exports.uploadVerification = async (req, res) => {
     }
 
     // Generate file name without extension
-    const originalFileName = file.name || 'unnamed';
+    const originalFileName = file.name || `unnamed-${documentType}`;
     const baseName = originalFileName.split('.').slice(0, -1).join('.'); // Handle multiple dots
-    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, ''); // Sanitize to remove special characters
-    const fileNameWithoutExtension = `verification/${Date.now()}-${sanitizedBaseName || 'document'}`;
+    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, '') || `user-${userId}-${documentType}`;
+    const fileNameWithoutExtension = `verification/${Date.now()}-${sanitizedBaseName}`;
 
-  
+    // Log file name for debugging
+    console.log('Original file name:', originalFileName);
+    console.log('Sanitized file name:', fileNameWithoutExtension);
+
+    // Upload to Vercel Blob
+    
+
     const { url } = await put(fileNameWithoutExtension, file.data, {
       access: 'public',
-      token: 'vercel_blob_rw_ubyMb8ZscVamsyXO_9ZMREwWUwN9g4BEHXhnS3HrXewymL4',
+      token: process.env.VERCEL_BLOB_TOKEN,
     });
 
     // Save to MongoDB
@@ -106,6 +112,8 @@ exports.uploadVerification = async (req, res) => {
     });
   }
 };
+
+
 
 exports.checkVerificationStatus = async (req, res) => {
   try {
