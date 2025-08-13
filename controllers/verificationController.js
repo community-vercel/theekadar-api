@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 
 exports.uploadVerification = async (req, res) => {
   try {
+    
     const { userId, documentType, document } = req.body;
 
     // Validate fields
