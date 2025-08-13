@@ -75,14 +75,10 @@ exports.uploadVerification = async (req, res) => {
     const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9]/g, ''); // Sanitize to remove special characters
     const fileNameWithoutExtension = `verification/${Date.now()}-${sanitizedBaseName || 'document'}`;
 
-    // Upload to Vercel Blob
-    if (!process.env.VERCEL_BLOB_TOKEN) {
-      throw new Error('Vercel Blob token is not configured');
-    }
-
+  
     const { url } = await put(fileNameWithoutExtension, file.data, {
       access: 'public',
-      token: process.env.VERCEL_BLOB_TOKEN,
+      token: 'vercel_blob_rw_ubyMb8ZscVamsyXO_9ZMREwWUwN9g4BEHXhnS3HrXewymL4',
     });
 
     // Save to MongoDB
