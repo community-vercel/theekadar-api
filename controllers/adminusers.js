@@ -3,6 +3,7 @@ const Verification = require('../models/Verification');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 
 exports.login = async (req, res) => {
   try {
@@ -129,13 +130,19 @@ exports.getAllUsers = async (req, res) => {
     const users = await User.find({ role: { $ne: 'admin' } })
       .select('email role isVerified createdAt')
       .skip(skip)
-      .limit(pageSize);
+      .limit(pageSize)
+      .lean();
 
     const totalUsers = await User.countDocuments({ role: { $ne: 'admin' } });
     const totalPages = Math.ceil(totalUsers / pageSize);
 
-    const profiles = await Profile.find({ 'userId.role': { $ne: 'admin' } }).populate('userId', 'email role isVerified');
-    const verifications = await Verification.find({ 'userId.role': { $ne: 'admin' } }).populate('userId', 'email');
+    const userIds = users.map((user) => user._id);
+    const profiles = await Profile.find({ userId: { $in: userIds } })
+      .populate('userId', 'email role isVerified')
+      .lean();
+    const verifications = await Verification.find({ userId: { $in: userIds } })
+      .populate('userId', 'email')
+      .lean();
 
     res.json({
       users,
@@ -145,22 +152,35 @@ exports.getAllUsers = async (req, res) => {
       currentPage: page,
     });
   } catch (error) {
+    console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
+// Delete user
 exports.deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    await User.findByIdAndDelete(userId);
-    await Profile.findOneAndDelete({ userId });
-    await Verification.findOneAndDelete({ userId });
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const user = await User.findByIdAndDelete(userId).lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await Profile.findOneAndDelete({ userId }).lean();
+    await Verification.findOneAndDelete({ userId }).lean();
+
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
+    console.error('Error deleting user:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
+// Update user
 exports.updateUserByAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -179,7 +199,7 @@ exports.updateUserByAdmin = async (req, res) => {
       verificationStatus,
     } = req.body;
 
-    if (!userId || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
 
@@ -188,12 +208,12 @@ exports.updateUserByAdmin = async (req, res) => {
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
-    const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+    const existingUser = await User.findOne({ email, _id: { $ne: userId } }).lean();
     if (existingUser) {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
-    const validRoles = ['client', 'worker', 'admin', 'thekedar'];
+    const validRoles = ['client', 'worker', 'admin', 'thekedar', 'contractor', 'consultant'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
     }
@@ -220,8 +240,8 @@ exports.updateUserByAdmin = async (req, res) => {
 
     let profile = null;
     if (role !== 'client') {
-      if (!name) {
-        return res.status(400).json({ message: 'Name is required for non-client roles' });
+      if (!name || !city || !town || !experience) {
+        return res.status(400).json({ message: 'Name, city, town, and experience are required for non-client roles' });
       }
       profile = await Profile.findOneAndUpdate(
         { userId },
@@ -239,7 +259,7 @@ exports.updateUserByAdmin = async (req, res) => {
         { new: true, runValidators: true, upsert: true, lean: true }
       );
     } else {
-      await Profile.findOneAndDelete({ userId });
+      await Profile.findOneAndDelete({ userId }).lean();
     }
 
     if (verificationStatus && role !== 'client') {
@@ -249,7 +269,7 @@ exports.updateUserByAdmin = async (req, res) => {
         { new: true, upsert: true, lean: true }
       );
     } else if (role === 'client' || currentRole === 'client') {
-      await Verification.findOneAndDelete({ userId });
+      await Verification.findOneAndDelete({ userId }).lean();
     }
 
     res.json({
@@ -262,3 +282,4 @@ exports.updateUserByAdmin = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
