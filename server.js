@@ -18,40 +18,16 @@ const cityRoutes = require('./routes/city'); // Assuming you have a cityRoutes f
 const postRoutes = require('./routes/postRoutes');
 const reviewRoutes = require('./routes/reviews');
 const admin = require('firebase-admin');
+const serviceAccount = require('./serviceAccount.json');
 
 connectDB();
 
 const app = express();
-const {
-  FIREBASE_API_KEY,
-  FIREBASE_PROJECT_ID,
-  FIREBASE_CLIENT_EMAIL,
-  FIREBASE_PRIVATE_KEY,
-  SESSION_COOKIE_MAX_AGE = 1000 * 60 * 60 * 24 * 5, // 5 days
-} = process.env;
 
-if (!FIREBASE_API_KEY) {
-  throw new Error('Missing FIREBASE_API_KEY in .env');
-}
-if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
-  throw new Error('Missing Firebase Admin SDK env vars (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)');
-}
-if (!admin.apps.length) {
-  // Normalize private key newlines
-  const privateKey = FIREBASE_PRIVATE_KEY.indexOf('\\n') !== -1
-    ? FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : FIREBASE_PRIVATE_KEY;
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: FIREBASE_PROJECT_ID,
-      clientEmail: FIREBASE_CLIENT_EMAIL,
-      privateKey,
-    }),
-  });
-}
-
-const ID_TOOLKIT_BASE = 'https://identitytoolkit.googleapis.com/v1';
 
 app.use(
   helmet({
