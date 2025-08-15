@@ -11,12 +11,96 @@ const { authMiddleware } = require('../middleware/auth');
 const { put } = require('@vercel/blob'); // For image uploads
 
 const mongoose = require('mongoose');
+const {
+  FIREBASE_API_KEY,
+  FIREBASE_PROJECT_ID,
+  FIREBASE_CLIENT_EMAIL,
+  FIREBASE_PRIVATE_KEY,
+  SESSION_COOKIE_MAX_AGE = 1000 * 60 * 60 * 24 * 5, // 5 days
+} = process.env;
+const ID_TOOLKIT_BASE = 'https://identitytoolkit.googleapis.com/v1';
 
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-reset-code', authController.verifyResetCode);
 router.post('/reset-password', authController.resetPassword);
+router.post('/send-otp', async (req, res) => {
+  try {
+    const { phoneNumber, recaptchaToken, safetyNetToken, playIntegrityToken } = req.body || {};
+
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'phoneNumber is required' });
+    }
+
+    // For web: recaptchaToken (recommended). For Android: safetyNetToken or playIntegrityToken.
+    const body = { phoneNumber };
+    if (recaptchaToken) body.recaptchaToken = recaptchaToken;
+    if (safetyNetToken) body.safetyNetToken = safetyNetToken;
+    if (playIntegrityToken) body.playIntegrityToken = playIntegrityToken;
+
+    const url = `${ID_TOOLKIT_BASE}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`;
+
+    const { data } = await axios.post(url, body, { timeout: 10000 });
+    // data.sessionInfo => return to client and use to verify code
+    return res.json({ sessionInfo: data.sessionInfo });
+  } catch (err) {
+    // pass Firebase error details
+    const status = err?.response?.status || 500;
+    const data = err?.response?.data || { error: err.message || 'sendVerificationCode failed' };
+    return res.status(status).json(data);
+  }
+});
+
+/**
+ * POST /firebase/verify-otp
+ * body: { sessionInfo: string, code: string, createSessionCookie?: boolean }
+ * returns: { idToken, refreshToken, phoneNumber, expiresIn, sessionCookie: boolean }
+ */
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { sessionInfo, code, createSessionCookie = true } = req.body || {};
+    if (!sessionInfo || !code) {
+      return res.status(400).json({ error: 'sessionInfo and code are required' });
+    }
+
+    const url = `${ID_TOOLKIT_BASE}/accounts:signInWithPhoneNumber?key=${FIREBASE_API_KEY}`;
+    const { data } = await axios.post(url, { sessionInfo, code }, { timeout: 10000 });
+    // data: { idToken, refreshToken, phoneNumber, expiresIn }
+
+    let createdCookie = false;
+    if (createSessionCookie && data.idToken) {
+      const expiresIn = parseInt(SESSION_COOKIE_MAX_AGE, 10);
+      try {
+        const sessionCookie = await admin.auth().createSessionCookie(data.idToken, { expiresIn });
+        // set cookie; secure should be true in production (HTTPS)
+        res.cookie('fb_session', sessionCookie, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'none',
+          maxAge: expiresIn,
+        });
+        createdCookie = true;
+      } catch (cookieErr) {
+        // cookie creation failed: continue but inform client
+        console.error('createSessionCookie error', cookieErr);
+      }
+    }
+
+    return res.json({
+      idToken: data.idToken,
+      refreshToken: data.refreshToken,
+      phoneNumber: data.phoneNumber,
+      expiresIn: data.expiresIn,
+      sessionCookie: createdCookie,
+    });
+  } catch (err) {
+    const status = err?.response?.status || 500;
+    const data = err?.response?.data || { error: err.message || 'signInWithPhoneNumber failed' };
+    return res.status(status).json(data);
+  }
+});
+
 // routes/authRoutes.js
 router.get('/:userId', authMiddleware, async (req, res) => {
   try {
