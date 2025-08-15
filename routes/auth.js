@@ -22,7 +22,7 @@ router.post('/reset-password', authController.resetPassword);
 router.post('/send-otp', async (req, res) => {
   const { phoneNumber, recaptchaToken } = req.body;
 
-  if (!phoneNumber || !recaptchaToken) {
+  if (!phoneNumber) {
     return res.status(400).json({ error: 'phoneNumber and recaptchaToken are required' });
   }
 
@@ -30,7 +30,7 @@ router.post('/send-otp', async (req, res) => {
     const url = `${ID_TOOLKIT_BASE}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`;
     const response = await axios.post(
       url,
-      { phoneNumber, recaptchaToken },
+      { phoneNumber },
       { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
     );
 
