@@ -86,6 +86,7 @@ router.get('/:userId', authMiddleware, async (req, res) => {
       createdAt: profile.userId.createdAt,
       profileImage: profile.logo || null,
       skills: profile.skills || [],
+      features:profile.features || [],
       experience: profile.experience || 0,
       callCount: profile.callCount || 0,
       city: profile.city || null,
