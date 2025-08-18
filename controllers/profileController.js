@@ -51,12 +51,12 @@ exports.createProfile = async (req, res) => {
   if (existingProfile) return res.status(400).json({ message: 'Profile already exists' });
 
   const { skills, features } = req.body;
-  if (skills && user.role !== 'worker') {
-    return res.status(403).json({ message: 'Only workers can add skills' });
-  }
-  if (features && !['thekadar', 'small_consultant', 'large_consultant'].includes(user.role)) {
-    return res.status(403).json({ message: 'Only thekadar or consultants can add features' });
-  }
+  // if (skills && user.role !== 'worker') {
+  //   return res.status(403).json({ message: 'Only workers can add skills' });
+  // }
+  // if (features && !['thekadar', 'small_consultant', 'large_consultant'].includes(user.role)) {
+  //   return res.status(403).json({ message: 'Only thekadar or consultants can add features' });
+  // }
 
   let logoUrl = '';
   if (req.body.logo) {
