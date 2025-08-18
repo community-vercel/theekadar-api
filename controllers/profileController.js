@@ -82,7 +82,7 @@ exports.createProfile = async (req, res) => {
       city: req.body.city,
       town: req.body.town,
       address: req.body.address,
-      experience: req.body.experience, // Use 'experience' (assuming schema is updated)
+      experience: req.body.experience, 
       logo: logoUrl,
       skills: skills || [],
       features: features || [],
@@ -103,12 +103,12 @@ exports.updateProfile = async (req, res) => {
   const profile = await Profile.findOne({ userId: req.user.userId });
   if (!profile) return res.status(404).json({ message: 'Profile not found' });
 
-  if (req.body.skills && user.role !== 'worker') {
-    return res.status(403).json({ message: 'Only workers can add skills' });
-  }
-  if (req.body.features && !['thekadar', 'small_consultant', 'large_consultant'].includes(user.role)) {
-    return res.status(403).json({ message: 'Only thekadar or consultants can add features' });
-  }
+  // if (req.body.skills && user.role !== 'worker') {
+  //   return res.status(403).json({ message: 'Only workers can add skills' });
+  // }
+  // if (req.body.features && !['thekadar', 'small_consultant', 'large_consultant'].includes(user.role)) {
+  //   return res.status(403).json({ message: 'Only thekadar or consultants can add features' });
+  // }
 
   let logoUrl = profile.logo;
   if (req.body.logo) {
