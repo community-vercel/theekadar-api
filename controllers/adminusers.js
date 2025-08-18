@@ -2,6 +2,7 @@ const Profile = require('../models/profile');
 const Verification = require('../models/Verification');
 const User = require('../models/User');
 const Post=require('../models/Post');
+const Job=require('../models/Job')
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -190,6 +191,9 @@ exports.deleteUser = async (req, res) => {
         Profile.findOneAndDelete({ userId }, { session }),
         Verification.findOneAndDelete({ userId }, { session }),
         Post.findOneAndDelete({ userId }, { session }),
+        Verification.findOneAndDelete({ userId }, { session }),
+        Job.findOneAndDelete({ userId }, { session }),
+        User.findOneAndDelete({ userId }, { session }),
         // Add other models here but exclude Review model
         // Example: Job.deleteMany({ userId }, { session }),
         // Example: Booking.deleteMany({ userId }, { session }),
