@@ -62,6 +62,7 @@ exports.register = async (req, res) => {
     { expiresIn: '7d' }
   );
 
+  
   res.status(201).json({ token, userId: user._id });
 };
 
