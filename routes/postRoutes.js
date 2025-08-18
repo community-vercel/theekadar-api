@@ -103,37 +103,23 @@ router.get('/category/:category', async (req, res) => {
   try {
     const { category } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 10;const posts = await Post.find({ category })
+  .populate({
+    path: 'userId',
+    select: 'name email phone role isVerified',
+    populate: {
+      path: 'profile',
+      model: 'Profile',
+      select: 'logo skills experience callCount city town address verificationStatus rating',
+    },
+  })
+  .skip((page - 1) * limit)
+  .limit(limit)
+  .sort({ createdAt: -1 });
 
-    const posts = await Post.find({ category })
-      .populate({
-        path: 'userId',
-        select: 'name email phone role isVerified',
-        populate: {
-          path: 'profile',
-          model: 'Profile',
-          select: 'logo skills experience callCount city town address verificationStatus rating',
-        },
-      })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .sort({ createdAt: -1 });
-
-    const total = await Post.countDocuments({ category });
-
-    const formattedPosts = posts.map(post => ({
-      _id: post._id,
-      title: post.title,
-      description: post.description,
-      category: post.category,
-      images: post.images,
-      hourlyRate: post.hourlyRate,
-      availability: post.availability,
-      serviceType: post.serviceType,
-      projectScale: post.projectScale,
-      certifications: post.certifications,
-      createdAt: post.createdAt,
-      userId: {
+const total = await Post.countDocuments({ category });console.log(posts);
+    const formattedPosts = posts.map(post => {
+      const user = post.userId ? {
         _id: post.userId._id,
         name: post.userId.name,
         email: post.userId.email,
@@ -149,19 +135,33 @@ router.get('/category/:category', async (req, res) => {
         town: post.userId.profile ? post.userId.profile.town : null,
         address: post.userId.profile ? post.userId.profile.address : null,
         verificationStatus: post.userId.profile ? post.userId.profile.verificationStatus : null,
-      },
-    }));
+      } : null;  return {
+    _id: post._id,
+    title: post.title,
+    description: post.description,
+    category: post.category,
+    images: post.images,
+    hourlyRate: post.hourlyRate,
+    availability: post.availability,
+    serviceType: post.serviceType,
+    projectScale: post.projectScale,
+    certifications: post.certifications,
+    createdAt: post.createdAt,
+    userId: user,
+  };
+});
 
-    res.status(200).json({
-      posts: formattedPosts,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-    });
-  } catch (error) {
+res.status(200).json({
+  posts: formattedPosts,
+  total,
+  page,
+  pages: Math.ceil(total / limit),
+});  } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
+
 
 
 module.exports = router;
