@@ -206,11 +206,12 @@ exports.deleteUser = async (req, res) => {
 };
 
 // Update user by admin
+
 exports.updateUserByAdmin = async (req, res) => {
   const session = await mongoose.startSession();
-  
+
   try {
-    await session.withTransaction(async () => {
+    const result = await session.withTransaction(async () => {
       const { userId } = req.params;
       const {
         email,
@@ -279,7 +280,7 @@ exports.updateUserByAdmin = async (req, res) => {
       );
 
       let profile = null;
-      
+
       // Handle profile based on role
       if (role !== 'client') {
         // Non-client roles need profile
@@ -307,37 +308,37 @@ exports.updateUserByAdmin = async (req, res) => {
       }
 
       // Handle verification
-      if (role !== 'client') {
-        // Update or create verification record
-        if (verificationStatus || documentType || documentUrl) {
-          const verificationData = {};
-          if (verificationStatus) verificationData.status = verificationStatus;
-          if (documentType) verificationData.documentType = documentType;
-          if (documentUrl) verificationData.documentUrl = documentUrl;
-          verificationData.updatedAt = Date.now();
+      if (role !== 'client' && (verificationStatus || documentType || documentUrl)) {
+        const verificationData = {};
+        if (verificationStatus) verificationData.status = verificationStatus;
+        if (documentType) verificationData.documentType = documentType;
+        if (documentUrl) verificationData.documentUrl = documentUrl;
+        verificationData.updatedAt = Date.now();
 
-          await Verification.findOneAndUpdate(
-            { userId },
-            verificationData,
-            { new: true, upsert: true, session, lean: true }
-          );
-        }
-      } else {
+        await Verification.findOneAndUpdate(
+          { userId },
+          verificationData,
+          { new: true, upsert: true, session, lean: true }
+        );
+      } else if (role === 'client') {
         // Client role - remove verification if exists
         await Verification.findOneAndDelete({ userId }, { session });
       }
 
-      return { updatedUser, profile };
+      return { updatedUser, profile }; // Return result for withTransaction
     });
 
-    const result = await session.commitTransaction();
+    // No need to call session.commitTransaction() as withTransaction handles it
     res.json({
       message: 'User updated successfully',
       user: result.updatedUser,
       profile: result.profile,
     });
   } catch (error) {
-    await session.abortTransaction();
+    // Only abort if the transaction is still active
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     console.error('Error updating user:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   } finally {
