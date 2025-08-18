@@ -1,6 +1,7 @@
 const Profile = require('../models/profile');
 const Verification = require('../models/Verification');
 const User = require('../models/User');
+const Post=require('../models/Post');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -54,42 +55,45 @@ exports.updateUserProfile = async (req, res) => {
 exports.verifyWorker = async (req, res) => {
   try {
     const { userId, status } = req.body;
+    
+    // Validate userId
     if (!userId || !/^[0-9a-fA-F]{24}$/.test(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
+    
+    // Validate status
     const validStatuses = ['pending', 'approved', 'rejected'];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
+    
+    // Check if user exists and is not a client
     const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    
     if (user.role === 'client') {
       return res.status(400).json({ message: 'Verification not applicable for client role' });
     }
+
+    // Update verification status
     const verification = await Verification.findOneAndUpdate(
       { userId },
       { status, updatedAt: Date.now() },
       { new: true, upsert: true, lean: true }
     );
-    const profile = await Profile.findOneAndUpdate(
-      { userId },
-      { verificationStatus: status },
-      { new: true, lean: true }
-    );
-    if (!profile) {
-      return res.status(404).json({ message: 'Profile not found for user' });
-    }
+
+    // Update user verification status
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { isVerified: status === 'approved' },
       { new: true, lean: true }
     );
+
     res.json({
       message: `Worker ${status} successfully`,
       user: updatedUser,
-      profile,
       verification,
     });
   } catch (error) {
@@ -100,7 +104,7 @@ exports.verifyWorker = async (req, res) => {
 
 exports.getPendingVerifications = async (req, res) => {
   try {
-    const verifications = await Verification.find({ status: 'pending' }).populate('userId', 'email');
+    const verifications = await Verification.find({ status: 'pending' }).populate('userId', 'email name role');
     res.json(verifications);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -120,6 +124,7 @@ exports.searchUsersByLocation = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 exports.getAllUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -128,8 +133,8 @@ exports.getAllUsers = async (req, res) => {
 
     // Fetch users sorted by createdAt in descending order (latest first)
     const users = await User.find({ role: { $ne: 'admin' } })
-      .select('email role isVerified createdAt')
-      .sort({ createdAt: -1 }) // Sort by createdAt in descending order
+      .select('email name phone role isVerified createdAt')
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageSize)
       .lean();
@@ -138,11 +143,15 @@ exports.getAllUsers = async (req, res) => {
     const totalPages = Math.ceil(totalUsers / pageSize);
 
     const userIds = users.map((user) => user._id);
+    
+    // Fetch profiles for additional information
     const profiles = await Profile.find({ userId: { $in: userIds } })
-      .populate('userId', 'email role isVerified')
+      .populate('userId', 'email name phone role isVerified')
       .lean();
+    
+    // Fetch verifications
     const verifications = await Verification.find({ userId: { $in: userIds } })
-      .populate('userId', 'email')
+      .populate('userId', 'email name')
       .lean();
 
     res.json({
@@ -155,133 +164,183 @@ exports.getAllUsers = async (req, res) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
-  }};
+  }
+};
 
-
-  
-// Delete user
+// Delete user - preserves reviews but deletes all other related data
 exports.deleteUser = async (req, res) => {
+  const session = await mongoose.startSession();
+  
   try {
-    const { userId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
+    await session.withTransaction(async () => {
+      const { userId } = req.params;
+      
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new Error('Invalid user ID');
+      }
 
-    const user = await User.findByIdAndDelete(userId).lean();
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+      // Find and delete user
+      const user = await User.findByIdAndDelete(userId, { session }).lean();
+      if (!user) {
+        throw new Error('User not found');
+      }
 
-    await Profile.findOneAndDelete({ userId }).lean();
-    await Verification.findOneAndDelete({ userId }).lean();
+      // Delete related data (except reviews)
+      await Promise.all([
+        Profile.findOneAndDelete({ userId }, { session }),
+        Verification.findOneAndDelete({ userId }, { session }),
+        Post.findOneAndDelete({ userId }, { session }),
+        // Add other models here but exclude Review model
+        // Example: Job.deleteMany({ userId }, { session }),
+        // Example: Booking.deleteMany({ userId }, { session }),
+      ]);
+    });
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  } finally {
+    await session.endSession();
   }
 };
 
-// Update user
+// Update user by admin
 exports.updateUserByAdmin = async (req, res) => {
+  const session = await mongoose.startSession();
+  
   try {
-    const { userId } = req.params;
-    const {
-      email,
-      role,
-      isVerified,
-      name,
-      phone,
-      city,
-      town,
-      address,
-      experience,
-      skills,
-      features,
-      verificationStatus,
-    } = req.body;
+    await session.withTransaction(async () => {
+      const { userId } = req.params;
+      const {
+        email,
+        name,
+        phone,
+        role,
+        isVerified,
+        // Profile fields
+        city,
+        town,
+        address,
+        experience,
+        skills,
+        features,
+        // Verification fields
+        documentType,
+        documentUrl,
+        verificationStatus,
+      } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      return res.status(400).json({ message: 'Invalid email format' });
-    }
-
-    const existingUser = await User.findOne({ email, _id: { $ne: userId } }).lean();
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email already in use' });
-    }
-
-    const validRoles = ['client', 'worker', 'admin', 'thekedar', 'contractor', 'consultant'];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({ message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
-    }
-
-    const validStatuses = ['pending', 'approved', 'rejected'];
-    if (verificationStatus && !validStatuses.includes(verificationStatus)) {
-      return res.status(400).json({ message: `Invalid verification status. Must be one of: ${validStatuses.join(', ')}` });
-    }
-
-    const user = await User.findById(userId).lean();
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    const currentRole = user.role;
-
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { email, role, isVerified: isVerified ?? false },
-      { new: true, runValidators: true, lean: true }
-    );
-    if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    let profile = null;
-    if (role !== 'client') {
-      if (!name || !city || !town || !experience) {
-        return res.status(400).json({ message: 'Name, city, town, and experience are required for non-client roles' });
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new Error('Invalid user ID');
       }
-      profile = await Profile.findOneAndUpdate(
-        { userId },
-        {
-          name,
-          phone,
-          city,
-          town,
-          address,
-          experience,
-          skills: skills || [],
-          features: features || [],
-          verificationStatus: verificationStatus || 'pending',
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
+        throw new Error('Invalid email format');
+      }
+
+      // Check for duplicate email
+      const existingUser = await User.findOne({ email, _id: { $ne: userId } }, null, { session }).lean();
+      if (existingUser) {
+        throw new Error('Email already in use');
+      }
+
+      // Validate role
+      const validRoles = ['client', 'worker', 'admin', 'thekadar', 'contractor', 'consultant'];
+      if (!validRoles.includes(role)) {
+        throw new Error(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
+      }
+
+      // Validate verification status if provided
+      const validStatuses = ['pending', 'approved', 'rejected'];
+      if (verificationStatus && !validStatuses.includes(verificationStatus)) {
+        throw new Error(`Invalid verification status. Must be one of: ${validStatuses.join(', ')}`);
+      }
+
+      // Get current user
+      const currentUser = await User.findById(userId, null, { session }).lean();
+      if (!currentUser) {
+        throw new Error('User not found');
+      }
+
+      // Update user
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { 
+          email, 
+          name: name || currentUser.name,
+          phone: phone || currentUser.phone,
+          role, 
+          isVerified: verificationStatus === 'approved' ? true : (isVerified ?? false)
         },
-        { new: true, runValidators: true, upsert: true, lean: true }
+        { new: true, runValidators: true, session, lean: true }
       );
-    } else {
-      await Profile.findOneAndDelete({ userId }).lean();
-    }
 
-    if (verificationStatus && role !== 'client') {
-      await Verification.findOneAndUpdate(
-        { userId },
-        { status: verificationStatus, updatedAt: Date.now() },
-        { new: true, upsert: true, lean: true }
-      );
-    } else if (role === 'client' || currentRole === 'client') {
-      await Verification.findOneAndDelete({ userId }).lean();
-    }
+      let profile = null;
+      
+      // Handle profile based on role
+      if (role !== 'client') {
+        // Non-client roles need profile
+        if (!name || !city || !town || !experience) {
+          throw new Error('Name, city, town, and experience are required for non-client roles');
+        }
+        
+        profile = await Profile.findOneAndUpdate(
+          { userId },
+          {
+            name,
+            phone,
+            city,
+            town,
+            address,
+            experience,
+            skills: skills || [],
+            features: features || [],
+          },
+          { new: true, runValidators: true, upsert: true, session, lean: true }
+        );
+      } else {
+        // Client role - remove profile if exists
+        await Profile.findOneAndDelete({ userId }, { session });
+      }
 
+      // Handle verification
+      if (role !== 'client') {
+        // Update or create verification record
+        if (verificationStatus || documentType || documentUrl) {
+          const verificationData = {};
+          if (verificationStatus) verificationData.status = verificationStatus;
+          if (documentType) verificationData.documentType = documentType;
+          if (documentUrl) verificationData.documentUrl = documentUrl;
+          verificationData.updatedAt = Date.now();
+
+          await Verification.findOneAndUpdate(
+            { userId },
+            verificationData,
+            { new: true, upsert: true, session, lean: true }
+          );
+        }
+      } else {
+        // Client role - remove verification if exists
+        await Verification.findOneAndDelete({ userId }, { session });
+      }
+
+      return { updatedUser, profile };
+    });
+
+    const result = await session.commitTransaction();
     res.json({
       message: 'User updated successfully',
-      user: updatedUser,
-      profile: role !== 'client' ? profile : null,
+      user: result.updatedUser,
+      profile: result.profile,
     });
   } catch (error) {
+    await session.abortTransaction();
     console.error('Error updating user:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  } finally {
+    await session.endSession();
   }
 };
-

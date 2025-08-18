@@ -1,13 +1,24 @@
 // routes/users.js
 const express = require('express');
 const router = express.Router();
-const {getUserProfile, updateUserProfile, verifyWorker, getPendingVerifications, searchUsersByLocation, getAllUsers, deleteUser, updateUserByAdmin,login } = require('../controllers/adminusers');
+const {
+  getUserProfile,
+  updateUserProfile,
+  verifyWorker,
+  getPendingVerifications,
+  searchUsersByLocation,
+  getAllUsers,
+  deleteUser,
+  updateUserByAdmin,
+  login
+} = require('../controllers/adminusers');
 const { validate, updateUserSchemas } = require('../middleware/validation');
 const admin = require('../middleware/admin');
 
 const User = require('../models/User');
 const Verification = require('../models/Verification');
-const Profile=require('../models/profile');
+const Profile = require('../models/profile');
+
 router.get('/profile', admin(['client', 'worker', 'admin']), getUserProfile);
 router.put('/profile', admin(['client', 'worker', 'admin']), validate(updateUserSchemas), updateUserProfile);
 router.post('/verify-worker', admin(['admin']), verifyWorker);
@@ -41,7 +52,7 @@ router.get('/analytics', async (req, res) => {
         { $sort: { role: 1 } },
       ]),
 
-      // Users by verification status
+      // Users by verification status - now from Verification model only
       Verification.aggregate([
         { $group: { _id: '$status', count: { $sum: 1 } } },
         { $project: { status: '$_id', count: 1, _id: 0 } },
@@ -61,8 +72,8 @@ router.get('/analytics', async (req, res) => {
         { $match: { city: { $exists: true, $ne: null } } },
         { $group: { _id: '$city', count: { $sum: 1 } } },
         { $project: { city: '$_id', count: 1, _id: 0 } },
-        { $sort: { count: -1 } }, // Sort by count descending
-        { $limit: 10 }, // Limit to top 10 cities
+        { $sort: { count: -1 } },
+        { $limit: 10 },
       ]),
 
       // Users by skill (non-client roles)
@@ -71,14 +82,14 @@ router.get('/analytics', async (req, res) => {
         { $unwind: '$skills' },
         { $group: { _id: '$skills', count: { $sum: 1 } } },
         { $project: { skill: '$_id', count: 1, _id: 0 } },
-        { $sort: { count: -1 } }, // Sort by count descending
-        { $limit: 10 }, // Limit to top 10 skills
+        { $sort: { count: -1 } },
+        { $limit: 10 },
       ]),
 
       // Average experience per role
       User.aggregate([
         {
-          $match: { role: { $in: ['worker', 'thekadar', 'contractor', 'consultant'] } }, // Exclude client, admin
+          $match: { role: { $in: ['worker', 'thekadar', 'contractor', 'consultant'] } },
         },
         {
           $lookup: {
@@ -99,7 +110,7 @@ router.get('/analytics', async (req, res) => {
         {
           $project: {
             role: '$_id',
-            avgExperience: { $round: ['$avgExperience', 2] }, // Round to 2 decimals
+            avgExperience: { $round: ['$avgExperience', 2] },
             count: 1,
             _id: 0,
           },
@@ -108,7 +119,7 @@ router.get('/analytics', async (req, res) => {
       ]),
     ]);
 
-    // Ensure all dates in the last 30 days are included, even with zero counts
+    // Ensure all dates in the last 30 days are included
     const dateMap = new Map(registrationTrends.map((item) => [item.date, item.count]));
     const allDates = [];
     for (let i = 0; i < 30; i++) {
