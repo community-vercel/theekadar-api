@@ -2,23 +2,35 @@ const mongoose = require('mongoose');
 const profile = require('./profile');
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  email: { 
+    type: String, 
+    required: function() { return !this.googleId; }, // Email not required if googleId exists
+    unique: true, 
+    sparse: true // Allows null values for users signing in with Google
+  },
+  password: { 
+    type: String, 
+    required: function() { return !this.googleId; } // Password not required if googleId exists
+  },
+  googleId: { 
+    type: String, 
+    unique: true, 
+    sparse: true // Allows null values for non-Google users
+  },
   name: { type: String, required: true },
   phone: { type: String, required: true },
   role: { 
     type: String, 
-    enum: ['client', 'worker', 'thekadar', 'contractor', 'consultant','admin'], 
+    enum: ['client', 'worker', 'thekadar', 'contractor', 'consultant', 'admin'], 
     required: true 
   },
   profileImage: { type: String },
   isVerified: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
-
   resetPasswordToken: { type: String },
   resetPasswordExpires: { type: Date },
   resetPasswordCode: { type: String },
-  resetPasswordVerified: { type: Boolean, default: false } // ✅ Added
+  resetPasswordVerified: { type: Boolean, default: false }
 });
 
 // Virtual field for Profile

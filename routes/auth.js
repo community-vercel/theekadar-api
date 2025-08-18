@@ -10,7 +10,21 @@ const { authMiddleware } = require('../middleware/auth');
 const { put } = require('@vercel/blob'); // For image uploads
 
 const mongoose = require('mongoose');
+const passport = require('passport');
 
+// Initiate Google login
+router.get('/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+// Google callback route
+router.get('/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    // Successful authentication, redirect to home or profile
+    res.redirect('/dashboard');
+  }
+);
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/forgot-password', authController.forgotPassword);
