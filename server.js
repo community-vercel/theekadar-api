@@ -1,8 +1,6 @@
 require('dotenv').config(); // 👈 must be first
 const express = require('express');
 const connectDB = require('./config/db');
-const passport = require('./config/passport'); // Path to your passport config
-const session = require('express-session');
 
 const fileUpload = require('express-fileupload');
 const cors = require('cors');
@@ -30,13 +28,7 @@ const app = express();
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false
-}));
-app.use(passport.initialize());
-app.use(passport.session());
+
 
 app.use(
   helmet({

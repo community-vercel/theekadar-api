@@ -8,7 +8,6 @@ const Profile = require('../models/profile');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-
 // Validation schema for registration
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -19,11 +18,14 @@ const registerSchema = Joi.object({
 });
 
   
-// Validation schema for login
+
+
+// Joi schema for login validation
 const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  identifier: Joi.string().required(), // Can be email or phone
   password: Joi.string().required(),
 });
+
 
 // controllers/authController.js
 exports.register = async (req, res) => {
@@ -42,19 +44,35 @@ exports.register = async (req, res) => {
   const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.status(201).json({ token, userId: user._id });
 };
+
 exports.login = async (req, res) => {
   const { error } = loginSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+  const { identifier, password } = req.body;
 
+  // Find user by email or phone
+  const user = await User.findOne({
+    $or: [
+      { email: identifier },
+      { phone: identifier },
+    ],
+  });
+
+  if (!user) return res.status(400).json({ message: 'Invalid email or phone number' });
+
+  // Check if user is a Google user (no password)
+  if (user.googleId && !user.password) {
+    return res.status(400).json({ message: 'Please use Google Sign-In for this account' });
+  }
+
+  // Verify password
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
+  // Generate JWT
   const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, userId: user._id,isVerified:user.isVerified });
+  res.json({ token, userId: user._id, isVerified: user.isVerified });
 };
 
 

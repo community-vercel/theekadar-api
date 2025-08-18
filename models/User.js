@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
     type: String, 
     required: function() { return !this.googleId; }, // Email not required if googleId exists
     unique: true, 
-    sparse: true // Allows null values for users signing in with Google
+    sparse: true // Allows null values for Google users
   },
   password: { 
     type: String, 
@@ -18,7 +18,12 @@ const userSchema = new mongoose.Schema({
     sparse: true // Allows null values for non-Google users
   },
   name: { type: String, required: true },
-  phone: { type: String, required: true },
+  phone: { 
+    type: String, 
+    required: function() { return !this.googleId; }, // Phone not required if googleId exists
+    unique: true, // Ensure no duplicate phone numbers
+    sparse: true // Allows null values for Google users with no phone
+  },
   role: { 
     type: String, 
     enum: ['client', 'worker', 'thekadar', 'contractor', 'consultant', 'admin'], 

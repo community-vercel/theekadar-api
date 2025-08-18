@@ -10,21 +10,47 @@ const { authMiddleware } = require('../middleware/auth');
 const { put } = require('@vercel/blob'); // For image uploads
 
 const mongoose = require('mongoose');
-const passport = require('passport');
+const { OAuth2Client } = require('google-auth-library');
 
-// Initiate Google login
-router.get('/google', passport.authenticate('google', {
-  scope: ['profile', 'email']
-}));
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Google callback route
-router.get('/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    // Successful authentication, redirect to home or profile
-    res.redirect('/dashboard');
+// Existing routes
+
+
+
+// New endpoint for mobile ID token
+router.post('/google/mobile', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    let user = await User.findOne({ googleId: payload.sub });
+    if (!user) {
+      user = await User.findOne({ email: payload.email });
+      if (user) {
+        user.googleId = payload.sub;
+        await user.save();
+      } else {
+        user = new User({
+          googleId: payload.sub,
+          email: payload.email,
+          name: payload.name,
+          phone: 'default-phone',
+          role: 'client',
+          profileImage: payload.picture,
+        });
+        await user.save();
+      }
+    }
+    // Optionally generate a JWT for the client
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: 'Authentication failed' });
   }
-);
+});
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/forgot-password', authController.forgotPassword);
