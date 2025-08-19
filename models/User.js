@@ -27,7 +27,6 @@ const userSchema = new mongoose.Schema({
   role: { 
     type: String, 
     enum: ['client', 'worker', 'thekadar', 'contractor', 'consultant', 'admin'], 
-    required: true 
   },
   profileImage: { type: String },
   isVerified: { type: Boolean, default: false },
