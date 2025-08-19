@@ -44,19 +44,31 @@ router.post('/google/mobile', async (req, res) => {
         user.googleId = payload.sub;
         user.profileImage = payload.picture || user.profileImage;
         await user.save();
-      } else {
-        // New user, create with provided or default data
+      } else if (name && phone && role) {
+        // Only create new user if all required fields are provided
         isNewUser = true;
         user = new User({
           googleId: payload.sub,
           email: payload.email,
           name: name || payload.name,
           phone: phone || null,
-          role: role || null, // Allow null for initial check
+          role: role,
           profileImage: payload.picture,
           isVerified: true,
         });
         await user.save();
+      } else {
+        // Return response indicating additional info is needed
+        return res.json({
+          success: true,
+          isNewUser: true,
+          hasRole: false,
+          user: {
+            email: payload.email,
+            name: payload.name,
+            profileImage: payload.picture,
+          },
+        });
       }
     } else {
       // Update existing user if additional info provided
@@ -78,8 +90,8 @@ router.post('/google/mobile', async (req, res) => {
       userId: user._id,
       isVerified: user.isVerified,
       role: user.role,
-      isNewUser, // Indicate if user is new
-      hasRole: !!user.role, // Indicate if user has a role
+      isNewUser,
+      hasRole: !!user.role,
       user: {
         id: user._id,
         email: user.email,
