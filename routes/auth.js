@@ -52,7 +52,7 @@ router.post('/google/mobile', async (req, res) => {
           email: payload.email,
           name: name || payload.name,
           phone: phone || null,
-          role: role || null, // Store null if no role provided
+          role: role || null, // Allow null for initial check
           profileImage: payload.picture,
           isVerified: true,
         });
