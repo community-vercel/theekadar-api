@@ -51,6 +51,7 @@ exports.createProfile = async (req, res) => {
   if (existingProfile) return res.status(400).json({ message: 'Profile already exists' });
 
   const { skills, features } = req.body;
+  
   // if (skills && user.role !== 'worker') {
   //   return res.status(403).json({ message: 'Only workers can add skills' });
   // }

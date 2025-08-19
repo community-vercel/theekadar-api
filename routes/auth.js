@@ -18,37 +18,77 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 
 
-// New endpoint for mobile ID token
+// Updated backend endpoint to handle additional user data from Flutter
 router.post('/google/mobile', async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, name, phone, role } = req.body;
+    
     const ticket = await client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
+    
     const payload = ticket.getPayload();
     let user = await User.findOne({ googleId: payload.sub });
+    
     if (!user) {
+      // Check if user exists with same email
       user = await User.findOne({ email: payload.email });
+      
       if (user) {
+        // Link Google account to existing user
         user.googleId = payload.sub;
+        user.profileImage = payload.picture || user.profileImage;
         await user.save();
       } else {
+        // Create new user with provided data
         user = new User({
           googleId: payload.sub,
           email: payload.email,
-          name: payload.name,
-          phone: 'default-phone',
-          role: 'client',
+          name: name || payload.name, // Use provided name or fallback to Google name
+          phone: phone || null, // Use provided phone
+          role: role || 'client', // Use provided role or default to client
           profileImage: payload.picture,
+          isVerified: true, // Google users are considered verified
         });
         await user.save();
       }
+    } else {
+      // Update existing Google user if additional info provided
+      if (name && name !== user.name) user.name = name;
+      if (phone && phone !== user.phone) user.phone = phone;
+      if (role && role !== user.role) user.role = role;
+      await user.save();
     }
-    // Optionally generate a JWT for the client
-    res.json({ user });
+
+    // Generate JWT token (optional - add this if you need authentication tokens)
+    // const token = jwt.sign(
+    //   { userId: user._id, role: user.role },
+    //   process.env.JWT_SECRET,
+    //   { expiresIn: '7d' }
+    // );
+
+    res.json({ 
+      success: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        phone: user.phone,
+        role: user.role,
+        profileImage: user.profileImage,
+        isVerified: user.isVerified
+      }
+      // token // Uncomment if using JWT
+    });
+    
   } catch (err) {
-    res.status(500).json({ error: 'Authentication failed' });
+    console.error('Google authentication error:', err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Authentication failed',
+      message: err.message 
+    });
   }
 });
 router.post('/register', authController.register);
