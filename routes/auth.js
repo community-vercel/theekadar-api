@@ -36,16 +36,30 @@ router.post('/google/mobile', async (req, res) => {
     let isNewUser = false;
 
     if (!user) {
-      // Check if user exists with same email
-      user = await User.findOne({ email: payload.email });
+      // Check if user exists with the same email
+      const existingEmailUser = await User.findOne({ email: payload.email });
+      if (existingEmailUser) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email already in use',
+          message: 'This email is already registered with another account.',
+        });
+      }
 
-      if (user) {
-        // Link Google account to existing user
-        user.googleId = payload.sub;
-        user.profileImage = payload.picture || user.profileImage;
-        await user.save();
-      } else if (name && phone && role) {
-        // Only create new user if all required fields are provided
+      // Check if user exists with the same phone number (if provided)
+      if (phone) {
+        const existingPhoneUser = await User.findOne({ phone });
+        if (existingPhoneUser) {
+          return res.status(400).json({
+            success: false,
+            error: 'Phone number already in use',
+            message: 'This phone number is already registered with another account.',
+          });
+        }
+      }
+
+      // If no user exists, check if all required fields are provided for new user creation
+      if (name && phone && role) {
         isNewUser = true;
         user = new User({
           googleId: payload.sub,
@@ -71,9 +85,20 @@ router.post('/google/mobile', async (req, res) => {
         });
       }
     } else {
-      // Update existing user if additional info provided
+      // For existing users, allow updating name, phone, or role if provided
       if (name && name !== user.name) user.name = name;
-      if (phone && phone !== user.phone) user.phone = phone;
+      if (phone) {
+        // Check if the new phone number is already in use by another user
+        const existingPhoneUser = await User.findOne({ phone, _id: { $ne: user._id } });
+        if (existingPhoneUser) {
+          return res.status(400).json({
+            success: false,
+            error: 'Phone number already in use',
+            message: 'This phone number is already registered with another account.',
+          });
+        }
+        user.phone = phone;
+      }
       if (role && role !== user.role) user.role = role;
       await user.save();
     }
