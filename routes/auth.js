@@ -6,7 +6,8 @@ const Profile = require('../models/profile');
 const Post=require('../models/Post');
 const Review=require('../models/Review');
 const { authMiddleware } = require('../middleware/auth');
-
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { put } = require('@vercel/blob'); // For image uploads
 
 const mongoose = require('mongoose');
@@ -68,19 +69,29 @@ router.post('/google/mobile', async (req, res) => {
     //   { expiresIn: '7d' }
     // );
 
-    res.json({ 
-      success: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        phone: user.phone,
-        role: user.role,
-        profileImage: user.profileImage,
-        isVerified: user.isVerified
-      }
-      // token // Uncomment if using JWT
-    });
+  const token = jwt.sign(
+  { userId: user._id, role: user.role },
+  process.env.JWT_SECRET,
+  { expiresIn: '7d' }
+);
+
+res.json({
+  success: true,
+  token,
+  userId: user._id,
+  isVerified: user.isVerified,
+  role: user.role,
+  user: {
+    id: user._id,
+    email: user.email,
+    name: user.name,
+    phone: user.phone,
+    role: user.role,
+    profileImage: user.profileImage,
+    isVerified: user.isVerified
+  }
+});
+
     
   } catch (err) {
     console.error('Google authentication error:', err);
