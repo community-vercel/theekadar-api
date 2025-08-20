@@ -147,6 +147,7 @@ router.get('/category/:category', async (req, res) => {
         isVerified: post.userId.isVerified,
         profileImage: post.userId.profile ? post.userId.profile.logo : null,
         rating: post.userId.profile ? post.userId.profile.rating : averageRating ? Number(averageRating.toFixed(2)) : null,
+        
         skills: post.userId.profile ? post.userId.profile.skills : null,
         experience: post.userId.profile ? post.userId.profile.experience : null,
         callCount: post.userId.profile ? post.userId.profile.callCount : 0,
