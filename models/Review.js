@@ -1,4 +1,3 @@
-// models/Review.js
 const mongoose = require('mongoose');
 
 const reviewSchema = new mongoose.Schema({
@@ -28,5 +27,8 @@ const reviewSchema = new mongoose.Schema({
     default: Date.now 
   },
 });
+
+// Add unique index to prevent multiple reviews from the same user for the same post
+reviewSchema.index({ postId: 1, userId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Review', reviewSchema);

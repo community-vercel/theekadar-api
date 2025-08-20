@@ -6,6 +6,7 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const {verifyToken} = require('../middleware/auth');
+const admin = require('../middleware/admin');
 
 // Create a review
 router.post('/', verifyToken, async (req, res) => {
@@ -26,10 +27,16 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
+    // Check if user has already reviewed this post
+    const existingReview = await Review.findOne({ postId, userId: req.user._id || req.user.userId });
+    if (existingReview) {
+      return res.status(400).json({ message: 'You have already reviewed this post' });
+    }
+
     // Create review
     const review = new Review({
       postId,
-      userId: req.user._id, // Populated by verifyToken middleware
+      userId: req.user._id || req.user.userId, // Populated by verifyToken middleware
       rating,
       comment,
     });
@@ -123,6 +130,17 @@ router.delete('/:reviewId', verifyToken, async (req, res) => {
 
     await review.deleteOne();
     res.status(200).json({ message: 'Review deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+router.get('/', async (req, res) => {
+  try {
+    const reviews = await Review.find()
+      .populate('postId', 'title') // Populate post title (adjust field as needed)
+      .populate('userId', 'name') // Populate user username (adjust field as needed)
+      .sort({ createdAt: -1 }); // Sort by newest first
+    res.status(200).json(reviews);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
