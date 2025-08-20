@@ -117,7 +117,6 @@ router.get('/place-details/:placeId', async (req, res) => {
 router.get('/map-profiles', async (req, res) => {
   try {
     const profiles = await Profile.find({ 
-      verificationStatus: 'approved',
       latitude: { $exists: true },
       longitude: { $exists: true }
     }).populate('userId', 'name email');
