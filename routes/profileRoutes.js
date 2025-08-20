@@ -111,8 +111,6 @@ router.get('/place-details/:placeId', async (req, res) => {
 
 // Create profile with address geocoding
 
-
-
 // Get all profiles with coordinates for map
 router.get('/map-profiles', async (req, res) => {
   try {
