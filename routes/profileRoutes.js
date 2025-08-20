@@ -113,16 +113,24 @@ router.get('/place-details/:placeId', async (req, res) => {
 
 
 // Get all profiles with coordinates for map
-router.get('/map-profiles', async (req, res) => {
+router.get('/map-profiles/:userId', async (req, res) => {
   try {
-    const profiles = await Profile.find({ 
+    const { userId } = req.params;
+
+    // Find a single profile for the specified userId where latitude and longitude exist
+    const profile = await Profile.findOne({ 
+      userId: userId,
       latitude: { $exists: true },
       longitude: { $exists: true }
     }).populate('userId', 'name email');
 
-    res.json(profiles);
+    if (!profile) {
+      return res.status(404).json({ message: 'Profile not found for this user' });
+    }
+
+    res.json(profile);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch profiles', error: error.message });
+    res.status(500).json({ message: 'Failed to fetch profile', error: error.message });
   }
 });
 module.exports = router;
