@@ -169,6 +169,8 @@ router.get('/:userId', authMiddleware, async (req, res) => {
       role: profile.userId.role,
       isVerified: profile.userId.isVerified,
       createdAt: profile.userId.createdAt,
+      latitude:profile.latitude || null,
+      longitude:profile.longitude || null,
       profileImage: profile.logo || null,
       skills: profile.skills || [],
       features:profile.features || [],
