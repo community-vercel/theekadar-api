@@ -12,6 +12,8 @@ const postSchema = new mongoose.Schema({
   serviceType: { type: String, enum: ['general', 'specialized', 'emergency', 'long_term'] },
   projectScale: { type: String, enum: ['small', 'medium', 'large'] },
   certifications: [{ type: String }],
+  reviews: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }], // Add this line
+
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -53,6 +53,7 @@ router.get('/:postId', async (req, res) => {
 
     // Calculate average rating for the post
     let averageRating = null;
+
     if (reviews.length > 0) {
       const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
       averageRating = (totalRating / reviews.length).toFixed(1);
@@ -100,25 +101,43 @@ router.get('/:postId', async (req, res) => {
 });
 
 router.get('/category/:category', async (req, res) => {
+  console.log("Fetching posts for category");
+
   try {
     const { category } = req.params;
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;const posts = await Post.find({ category })
-  .populate({
-    path: 'userId',
-    select: 'name email phone role isVerified',
-    populate: {
-      path: 'profile',
-      model: 'Profile',
-      select: 'logo skills experience callCount city town address verificationStatus rating',
-    },
-  })
-  .skip((page - 1) * limit)
-  .limit(limit)
-  .sort({ createdAt: -1 });
+    const limit = parseInt(req.query.limit) || 10;
 
-const total = await Post.countDocuments({ category });console.log(posts);
+    const posts = await Post.find({ category })
+      .populate({
+        path: 'userId',
+        select: 'name email phone role isVerified',
+        populate: {
+          path: 'profile',
+          model: 'Profile',
+          select: 'logo skills experience callCount city town address verificationStatus rating',
+        },
+      })
+      .populate({
+        path: 'reviews', // Populate reviews directly for the post
+        model: 'Review',
+        select: 'rating comment userId createdAt',
+        populate: {
+          path: 'userId', // Optionally populate the user who made the review
+          model: 'User',
+          select: 'name email',
+        },
+      })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Post.countDocuments({ category });
+    console.log("Posts fetched:", posts);
+
     const formattedPosts = posts.map(post => {
+      console.log("Formatting post:", post._id);
+
       const user = post.userId ? {
         _id: post.userId._id,
         name: post.userId.name,
@@ -135,28 +154,33 @@ const total = await Post.countDocuments({ category });console.log(posts);
         town: post.userId.profile ? post.userId.profile.town : null,
         address: post.userId.profile ? post.userId.profile.address : null,
         verificationStatus: post.userId.profile ? post.userId.profile.verificationStatus : null,
-      } : null;  return {
-    _id: post._id,
-    title: post.title,
-    description: post.description,
-    category: post.category,
-    images: post.images,
-    hourlyRate: post.hourlyRate,
-    availability: post.availability,
-    serviceType: post.serviceType,
-    projectScale: post.projectScale,
-    certifications: post.certifications,
-    createdAt: post.createdAt,
-    userId: user,
-  };
-});
+      } : null;
 
-res.status(200).json({
-  posts: formattedPosts,
-  total,
-  page,
-  pages: Math.ceil(total / limit),
-});  } catch (error) {
+      return {
+        _id: post._id,
+        title: post.title,
+        description: post.description,
+        category: post.category,
+        images: post.images,
+        hourlyRate: post.hourlyRate,
+        availability: post.availability,
+        serviceType: post.serviceType,
+        projectScale: post.projectScale,
+        certifications: post.certifications,
+        createdAt: post.createdAt,
+        userId: user,
+        reviews: post.reviews || [], // Include reviews in the response
+      };
+    });
+
+    res.status(200).json({
+      posts: formattedPosts,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error("Error fetching posts:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
