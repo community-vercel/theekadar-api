@@ -212,6 +212,8 @@ exports.getPost = async (req, res) => {
           name: '$user.name',
           profileImage: { $ifNull: ['$profile.logo', null] },
           address: { $ifNull: ['$profile.address', null] },
+           latitude:  { $ifNull: ['$profile.longitude', null] },
+          longitude:{ $ifNull: ['$profile.longitude', null] },
           experience: { $ifNull: ['$profile.experience', null] },
           rating: {
             $cond: {
@@ -396,6 +398,8 @@ exports.getUserPosts = async (req, res) => {
           postName: '$title',
           name: '$user.name',
           profileImage: { $ifNull: ['$profile.logo', null] },
+           latitude:  { $ifNull: ['$profile.longitude', null] },
+          longitude:{ $ifNull: ['$profile.longitude', null] },
           address: { $ifNull: ['$profile.address', null] },
           experience: { $ifNull: ['$profile.experience', null] },
           rating: {

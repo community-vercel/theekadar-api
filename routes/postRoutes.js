@@ -101,91 +101,101 @@ router.get('/:postId', async (req, res) => {
 });
 
 router.get('/category/:category', async (req, res) => {
-  console.log("Fetching posts for category");
-
   try {
     const { category } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
-    const posts = await Post.find({ category })
-      .populate({
-        path: 'userId',
-        select: 'name email phone role isVerified',
-        populate: {
-          path: 'profile',
-          model: 'Profile',
-          select: 'logo skills experience callCount city town address verificationStatus rating',
+    const posts = await Post.aggregate([
+      { $match: { category } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user',
         },
-      })
-      .populate({
-        path: 'reviews', // Populate reviews directly for the post
-        model: 'Review',
-        select: 'rating', // Only select the rating field to optimize query
-      })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .sort({ createdAt: -1 });
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'profiles',
+          localField: 'userId',
+          foreignField: 'userId',
+          as: 'profile',
+        },
+      },
+      { $unwind: { path: '$profile', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'reviews',
+          localField: '_id',
+          foreignField: 'postId',
+          as: 'reviews',
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          description: 1,
+          category: 1,
+          images: 1,
+          hourlyRate: 1,
+          availability: 1,
+          serviceType: 1,
+          projectScale: 1,
+          certifications: 1,
+          createdAt: 1,
+          userId: {
+            _id: '$user._id',
+            name: '$user.name',
+            email: '$user.email',
+            phone: '$user.phone',
+            role: '$user.role',
+            isVerified: '$user.isVerified',
+            profileImage: { $ifNull: ['$profile.logo', null] },
+            skills: { $ifNull: ['$profile.skills', null] },
+            experience: { $ifNull: ['$profile.experience', null] },
+            callCount: { $ifNull: ['$profile.callCount', 0] },
+            city: { $ifNull: ['$profile.city', null] },
+            town: { $ifNull: ['$profile.town', null] },
+            address: { $ifNull: ['$profile.address', null] },
+            verificationStatus: { $ifNull: ['$profile.verificationStatus', null] },
+            rating: {
+              $cond: {
+                if: { $gt: [{ $size: '$reviews' }, 0] },
+                then: { $round: [{ $avg: '$reviews.rating' }, 2] },
+                else: { $ifNull: ['$profile.rating', null] },
+              },
+            },
+          },
+          rating: {
+            $cond: {
+              if: { $gt: [{ $size: '$reviews' }, 0] },
+              then: { $round: [{ $avg: '$reviews.rating' }, 2] },
+              else: null,
+            },
+          },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: (page - 1) * limit },
+      { $limit: limit },
+    ]);
 
     const total = await Post.countDocuments({ category });
-    console.log("Posts fetched:", posts);
-
-    const formattedPosts = posts.map(post => {
-      console.log("Formatting post:", post._id);
-
-      // Calculate average rating from reviews
-      const averageRating = post.reviews.length > 0
-        ? post.reviews.reduce((sum, review) => sum + review.rating, 0) / post.reviews.length
-        : null;
-
-      const user = post.userId ? {
-        _id: post.userId._id,
-        name: post.userId.name,
-        email: post.userId.email,
-        phone: post.userId.phone,
-        role: post.userId.role,
-        isVerified: post.userId.isVerified,
-        profileImage: post.userId.profile ? post.userId.profile.logo : null,
-        rating: post.userId.profile ? post.userId.profile.rating : averageRating ? Number(averageRating.toFixed(2)) : null,
-      
-        
-        skills: post.userId.profile ? post.userId.profile.skills : null,
-        experience: post.userId.profile ? post.userId.profile.experience : null,
-        callCount: post.userId.profile ? post.userId.profile.callCount : 0,
-        city: post.userId.profile ? post.userId.profile.city : null,
-        town: post.userId.profile ? post.userId.profile.town : null,
-        address: post.userId.profile ? post.userId.profile.address : null,
-        verificationStatus: post.userId.profile ? post.userId.profile.verificationStatus : null,
-      } : null;
-
-      return {
-        _id: post._id,
-        title: post.title,
-        description: post.description,
-        category: post.category,
-        images: post.images,
-        hourlyRate: post.hourlyRate,
-        availability: post.availability,
-        serviceType: post.serviceType,
-        projectScale: post.projectScale,
-        certifications: post.certifications,
-        createdAt: post.createdAt,
-        userId: user,
-        rating: averageRating ? Number(averageRating.toFixed(2)) : null, // Include only the average rating
-      };
-    });
 
     res.status(200).json({
-      posts: formattedPosts,
+      posts,
       total,
       page,
       pages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error("Error fetching posts:", error);
+    console.error('Error fetching posts:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
+  }});
 
 
 
