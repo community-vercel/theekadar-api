@@ -79,7 +79,8 @@ router.get('/post/:postId', async (req, res) => {
 });
 
 // Update a review
-router.put('/:reviewId', verifyToken, async (req, res) => {
+router.put('/:reviewId', admin(['admin']), async (req, res) => {
+  console.log("e",req.user)
   try {
     const { reviewId } = req.params;
     const { rating, comment } = req.body;
@@ -94,7 +95,7 @@ router.put('/:reviewId', verifyToken, async (req, res) => {
     }
 
     // Check if user is the review author
-    if (review.userId.toString() !== req.user._id.toString()) {
+    if (review.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to update this review' });
     }
 
@@ -110,7 +111,7 @@ router.put('/:reviewId', verifyToken, async (req, res) => {
 });
 
 // Delete a review
-router.delete('/:reviewId', verifyToken, async (req, res) => {
+router.delete('/:reviewId',admin(['admin']), async (req, res) => {
   try {
     const { reviewId } = req.params;
 
@@ -124,7 +125,7 @@ router.delete('/:reviewId', verifyToken, async (req, res) => {
     }
 
     // Check if user is the review author
-    if (review.userId.toString() !== req.user._id.toString()) {
+    if (review.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to delete this review' });
     }
 
@@ -134,13 +135,27 @@ router.delete('/:reviewId', verifyToken, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-router.get('/', async (req, res) => {
+router.get('/', admin(['admin']), async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
     const reviews = await Review.find()
-      .populate('postId', 'title') // Populate post title (adjust field as needed)
-      .populate('userId', 'name') // Populate user username (adjust field as needed)
-      .sort({ createdAt: -1 }); // Sort by newest first
-    res.status(200).json(reviews);
+      .populate('postId', 'title')
+      .populate('userId', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Review.countDocuments();
+
+    res.status(200).json({
+      reviews,
+      total,
+      page,
+      pages: Math.ceil(total / limit)
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
