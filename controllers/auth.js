@@ -63,7 +63,7 @@ exports.register = async (req, res) => {
   );
 
 
-  res.status(201).json({ token, userId: user._id });
+  res.status(201).json({ token, userId: user._id,name:user.name,phone:user.phone });
 };
 
 exports.login = async (req, res) => {
@@ -93,7 +93,7 @@ exports.login = async (req, res) => {
 
   // Generate JWT
   const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, userId: user._id, isVerified: user.isVerified,role:user.role });
+  res.json({ token, userId: user._id, isVerified: user.isVerified,role:user.role,name:user.name,phone:user.phone });
 };
 
 
