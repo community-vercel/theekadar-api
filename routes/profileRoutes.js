@@ -47,29 +47,7 @@ router.get('/exists/:userId',authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-const geocodeAddress = async (address) => {
-  try {
-    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-      params: {
-        address: address,
-        key: process.env.GOOGLE_MAPS_API_KEY
-      }
-    });
 
-    if (response.data.status === 'OK' && response.data.results.length > 0) {
-      const result = response.data.results[0];
-      return {
-        latitude: result.geometry.location.lat,
-        longitude: result.geometry.location.lng,
-        formattedAddress: result.formatted_address,
-        placeId: result.place_id
-      };
-    }
-    throw new Error('Address not found');
-  } catch (error) {
-    throw new Error(`Geocoding failed: ${error.message}`);
-  }
-};
 
 // Search addresses using Google Places API
 // Enhanced search-address route
@@ -132,67 +110,8 @@ router.get('/place-details/:placeId', async (req, res) => {
 });
 
 // Create profile with address geocoding
-exports.createProfile = async (req, res) => {
-  try {
-    console.log('req.user:', req.user);
-    console.log('userId:', req.user?.userId);
 
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
 
-    const existingProfile = await Profile.findOne({ userId: req.user.userId });
-    if (existingProfile) return res.status(400).json({ message: 'Profile already exists' });
-
-    const { skills, features, address, name, phone, city, town, experience, logo } = req.body;
-
-    // Geocode the address
-    let geocodedData;
-    try {
-      geocodedData = await geocodeAddress(address);
-    } catch (geocodeError) {
-      return res.status(400).json({ message: 'Invalid address: ' + geocodeError.message });
-    }
-
-    let logoUrl = '';
-    if (logo) {
-      try {
-        const base64Data = logo.replace(/^data:image\/\w+;base64,/, '');
-        const buffer = Buffer.from(base64Data, 'base64');
-        const fileName = `profiles/${Date.now()}-logo.jpg`;
-        const { url } = await put(fileName, buffer, {
-          access: 'public',
-          token: process.env.VERCEL_BLOB_TOKEN,
-        });
-        logoUrl = url;
-      } catch (uploadError) {
-        return res.status(500).json({ message: 'Failed to upload logo', error: uploadError.message });
-      }
-    }
-
-    const profile = new Profile({
-      userId: req.user.userId,
-      name,
-      phone,
-      city,
-      town,
-      address,
-      latitude: geocodedData.latitude,
-      longitude: geocodedData.longitude,
-      formattedAddress: geocodedData.formattedAddress,
-      placeId: geocodedData.placeId,
-      experience,
-      logo: logoUrl,
-      skills: skills || [],
-      features: features || [],
-    });
-
-    await profile.save();
-    res.status(201).json(profile);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to create profile', error: error.message });
-  }
-};
 
 // Get all profiles with coordinates for map
 router.get('/map-profiles', async (req, res) => {
