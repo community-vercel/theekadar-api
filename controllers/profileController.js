@@ -4,6 +4,8 @@ const User = require('../models/User');
 const Profile = require('../models/profile');
 const Post = require('../models/Post');
 const Review=require('../models/Review');
+const axios = require('axios');
+
 const { put } = require('@vercel/blob');
 
 // Validation schema for profile creation and update
