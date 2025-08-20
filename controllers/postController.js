@@ -266,11 +266,47 @@ exports.updatePost = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Unauthorized to update this post' });
     }
 
+    let imageUrls = post.images || [];
+
+    // Handle new image uploads if images are provided
+    if (images && Array.isArray(images)) {
+      try {
+        // Delete existing images if they're being replaced
+        if (imageUrls.length > 0) {
+          // You might want to implement image deletion logic here
+          // For Vercel Blob, you'd need to extract the file path and delete
+          console.log('Old images would be deleted here:', imageUrls);
+        }
+
+        // Upload new images
+        imageUrls = await Promise.all(
+          images.map(async (base64Image, index) => {
+            // Check if it's already a URL (in case of mixed update)
+            if (typeof base64Image === 'string' && base64Image.startsWith('http')) {
+              return base64Image;
+            }
+            
+            // Remove base64 prefix
+            const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+            const buffer = Buffer.from(base64Data, 'base64');
+            const fileName = `posts/${Date.now()}-${index}-${Math.random().toString(36).substring(7)}.jpg`;
+            const { url } = await put(fileName, buffer, {
+              access: 'public',
+              token: process.env.VERCEL_BLOB_TOKEN,
+            });
+            return url;
+          })
+        );
+      } catch (uploadError) {
+        return res.status(500).json({ success: false, message: 'Failed to upload images', error: uploadError.message });
+      }
+    }
+
     const updateData = {};
     if (title) updateData.title = title;
     if (description) updateData.description = description;
     if (category) updateData.category = category;
-    if (images) updateData.images = images;
+    if (images) updateData.images = imageUrls; // Use the processed image URLs
     if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
     if (availability !== undefined) updateData.availability = availability;
     if (serviceType) updateData.serviceType = serviceType;
@@ -289,7 +325,6 @@ exports.updatePost = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 exports.deletePost = async (req, res) => {
   try {
     const { postId } = req.params;
