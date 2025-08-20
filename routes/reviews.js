@@ -140,7 +140,6 @@ router.get('/', admin(['admin']), async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-
     const reviews = await Review.find()
       .populate('postId', 'title')
       .populate('userId', 'name')
@@ -149,7 +148,6 @@ router.get('/', admin(['admin']), async (req, res) => {
       .limit(limit);
 
     const total = await Review.countDocuments();
-
     res.status(200).json({
       reviews,
       total,
