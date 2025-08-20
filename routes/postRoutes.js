@@ -121,12 +121,7 @@ router.get('/category/:category', async (req, res) => {
       .populate({
         path: 'reviews', // Populate reviews directly for the post
         model: 'Review',
-        select: 'rating comment userId createdAt',
-        populate: {
-          path: 'userId', // Optionally populate the user who made the review
-          model: 'User',
-          select: 'name email',
-        },
+        select: 'rating', // Only select the rating field to optimize query
       })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -138,6 +133,11 @@ router.get('/category/:category', async (req, res) => {
     const formattedPosts = posts.map(post => {
       console.log("Formatting post:", post._id);
 
+      // Calculate average rating from reviews
+      const averageRating = post.reviews.length > 0
+        ? post.reviews.reduce((sum, review) => sum + review.rating, 0) / post.reviews.length
+        : null;
+
       const user = post.userId ? {
         _id: post.userId._id,
         name: post.userId.name,
@@ -146,7 +146,7 @@ router.get('/category/:category', async (req, res) => {
         role: post.userId.role,
         isVerified: post.userId.isVerified,
         profileImage: post.userId.profile ? post.userId.profile.logo : null,
-        rating: post.userId.profile ? post.userId.profile.rating : null,
+        rating: post.userId.profile ? post.userId.profile.rating : averageRating ? Number(averageRating.toFixed(2)) : null,
         skills: post.userId.profile ? post.userId.profile.skills : null,
         experience: post.userId.profile ? post.userId.profile.experience : null,
         callCount: post.userId.profile ? post.userId.profile.callCount : 0,
@@ -169,7 +169,7 @@ router.get('/category/:category', async (req, res) => {
         certifications: post.certifications,
         createdAt: post.createdAt,
         userId: user,
-        reviews: post.reviews || [], // Include reviews in the response
+        rating: averageRating ? Number(averageRating.toFixed(2)) : null, // Include only the average rating
       };
     });
 
@@ -184,7 +184,6 @@ router.get('/category/:category', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-
 
 
 
