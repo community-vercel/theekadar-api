@@ -24,45 +24,41 @@ const postSearchSchema = Joi.object({
   availability: Joi.boolean().optional(),
 });
 // controllers/profileController.js
+
 const profileSchema = Joi.object({
-  name: Joi.string().required(),
+  name: Joi.string().optional(), // Changed to optional to match schema
   phone: Joi.string().optional(),
   address: Joi.string().optional(),
+  latitude: Joi.number().optional(), // Added
+  longitude: Joi.number().optional(), // Added
   skills: Joi.array().items(Joi.string()).optional(),
   features: Joi.array().items(Joi.string()).optional(),
   city: Joi.string().required(),
   town: Joi.string().required(),
-  experience: Joi.number().required().min(0), // Fixed: 'experiance' → 'experience'
+  experience: Joi.number().required().min(0),
   logo: Joi.string().optional(),
 });
 
 // controllers/profileController.js
 exports.createProfile = async (req, res) => {
-    console.log('req.user:', req.user); // Debug: Log req.user
-  console.log('userId:', req.user?.userId); // De
+  console.log('req.user:', req.user); // Debug: Log req.user
+  console.log('userId:', req.user?.userId); // Debug: Log userId
   const { error } = profileSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   const user = await User.findById(req.user.userId);
-  if (!user) return res.status(404).json({ message: 'User not found' }); // Add this check
+  if (!user) return res.status(404).json({ message: 'User not found' });
   if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
 
   const existingProfile = await Profile.findOne({ userId: req.user.userId });
   if (existingProfile) return res.status(400).json({ message: 'Profile already exists' });
 
-  const { skills, features } = req.body;
-  
-  // if (skills && user.role !== 'worker') {
-  //   return res.status(403).json({ message: 'Only workers can add skills' });
-  // }
-  // if (features && !['thekadar', 'small_consultant', 'large_consultant'].includes(user.role)) {
-  //   return res.status(403).json({ message: 'Only thekadar or consultants can add features' });
-  // }
+  const { skills, features, address, latitude, longitude, name, phone, city, town, experience, logo } = req.body;
 
   let logoUrl = '';
-  if (req.body.logo) {
+  if (logo) {
     try {
-      const base64Data = req.body.logo.replace(/^data:image\/\w+;base64,/, '');
+      const base64Data = logo.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
       const fileName = `profiles/${Date.now()}-logo.jpg`;
       const { url } = await put(fileName, buffer, {
@@ -78,12 +74,14 @@ exports.createProfile = async (req, res) => {
   try {
     const profile = new Profile({
       userId: req.user.userId,
-      name: req.body.name,
-      phone: req.body.phone,
-      city: req.body.city,
-      town: req.body.town,
-      address: req.body.address,
-      experience: req.body.experience, 
+      name,
+      phone,
+      city,
+      town,
+      address,
+      latitude, // Added
+      longitude, // Added
+      experience,
       logo: logoUrl,
       skills: skills || [],
       features: features || [],
@@ -104,13 +102,6 @@ exports.updateProfile = async (req, res) => {
   const profile = await Profile.findOne({ userId: req.user.userId });
   if (!profile) return res.status(404).json({ message: 'Profile not found' });
 
-  // if (req.body.skills && user.role !== 'worker') {
-  //   return res.status(403).json({ message: 'Only workers can add skills' });
-  // }
-  // if (req.body.features && !['thekadar', 'small_consultant', 'large_consultant'].includes(user.role)) {
-  //   return res.status(403).json({ message: 'Only thekadar or consultants can add features' });
-  // }
-
   let logoUrl = profile.logo;
   if (req.body.logo) {
     try {
@@ -122,8 +113,6 @@ exports.updateProfile = async (req, res) => {
         token: process.env.VERCEL_BLOB_TOKEN,
       });
       logoUrl = url;
-
-      // ✅ Save image in User model as well
       user.profileImage = logoUrl;
     } catch (uploadError) {
       return res.status(500).json({ message: 'Failed to upload logo', error: uploadError.message });
@@ -131,16 +120,16 @@ exports.updateProfile = async (req, res) => {
   }
 
   try {
-    // Update User name if provided
     if (req.body.name) {
       user.name = req.body.name;
     }
     await user.save();
 
-    // Update Profile fields
     profile.name = req.body.name || profile.name;
     profile.phone = req.body.phone || profile.phone;
     profile.address = req.body.address || profile.address;
+    profile.latitude = req.body.latitude || profile.latitude; // Added
+    profile.longitude = req.body.longitude || profile.longitude; // Added
     profile.skills = req.body.skills || profile.skills;
     profile.features = req.body.features || profile.features;
     profile.experience = req.body.experience || profile.experience;
@@ -150,7 +139,6 @@ exports.updateProfile = async (req, res) => {
 
     await profile.save();
 
-    // Return merged updated data
     const mergedProfile = {
       _id: user._id,
       name: user.name,
@@ -159,13 +147,15 @@ exports.updateProfile = async (req, res) => {
       role: user.role,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
-      profileImage: user.profileImage, // ✅ from User now
+      profileImage: user.profileImage,
       skills: profile.skills,
       experience: profile.experience,
       callCount: profile.callCount,
       city: profile.city,
       town: profile.town,
       address: profile.address,
+      latitude: profile.latitude, // Added
+      longitude: profile.longitude, // Added
       verificationStatus: profile.verificationStatus,
     };
 

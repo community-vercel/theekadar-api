@@ -1,4 +1,3 @@
-// models/Profile.js
 const mongoose = require('mongoose');
 
 const profileSchema = new mongoose.Schema({
@@ -8,7 +7,9 @@ const profileSchema = new mongoose.Schema({
   city: { type: String, required: true },
   town: { type: String, required: true },
   address: { type: String },
-  experience: { type: Number, required: true, min: 0 }, // Fixed: 'experiance' → 'experience'
+  latitude: { type: Number, required: true },
+  longitude: { type: Number, required: true },
+  experience: { type: Number, required: true, min: 0 },
   logo: { type: String },
   skills: [{ type: String }],
   features: [{ type: String }],
@@ -18,8 +19,8 @@ const profileSchema = new mongoose.Schema({
     default: 'pending' 
   },
   callCount: { type: Number, default: 0 },
+  formattedAddress: { type: String }, // Store formatted address from Google
+  placeId: { type: String }, // Store Google Place ID for future reference
 });
-
-
 
 module.exports = mongoose.model('Profile', profileSchema);
