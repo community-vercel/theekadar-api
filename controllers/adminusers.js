@@ -5,6 +5,8 @@ const Post=require('../models/Post');
 const Job=require('../models/Job')
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendFCMNotification } = require('../utils/fcm');
+
 const mongoose = require('mongoose');
 
 exports.login = async (req, res) => {
@@ -52,45 +54,57 @@ exports.updateUserProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 exports.verifyWorker = async (req, res) => {
   try {
     const { userId, status } = req.body;
-    
-    // Validate userId
+
     if (!userId || !/^[0-9a-fA-F]{24}$/.test(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
-    
-    // Validate status
+
     const validStatuses = ['pending', 'approved', 'rejected'];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
-    
-    // Check if user exists and is not a client
+
     const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (user.role === 'client') {
       return res.status(400).json({ message: 'Verification not applicable for client role' });
     }
 
-    // Update verification status
+    const previousVerification = await Verification.findOne({ userId }).lean();
+    const previousStatus = previousVerification?.status || 'pending';
+
     const verification = await Verification.findOneAndUpdate(
       { userId },
       { status, updatedAt: Date.now() },
       { new: true, upsert: true, lean: true }
     );
 
-    // Update user verification status
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { isVerified: status === 'approved' },
       { new: true, lean: true }
     );
+
+    if (status !== previousStatus && updatedUser.fcmToken) {
+      const notificationBody =
+        status === 'approved'
+          ? 'Your worker verification has been approved!'
+          : 'Your worker verification was rejected. Please contact support.';
+      const notificationResult = await sendFCMNotification(
+        updatedUser.fcmToken,
+        'Worker Verification Update',
+        notificationBody
+      );
+      console.log('Notification result:', notificationResult);
+    } else if (!updatedUser.fcmToken) {
+      console.warn(`No FCM token found for user ${userId}`);
+    }
 
     res.json({
       message: `Worker ${status} successfully`,
@@ -102,6 +116,7 @@ exports.verifyWorker = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 exports.getPendingVerifications = async (req, res) => {
   try {
@@ -223,14 +238,12 @@ exports.updateUserByAdmin = async (req, res) => {
         phone,
         role,
         isVerified,
-        // Profile fields
         city,
         town,
         address,
         experience,
         skills,
         features,
-        // Verification fields
         documentType,
         documentUrl,
         verificationStatus,
@@ -240,37 +253,35 @@ exports.updateUserByAdmin = async (req, res) => {
         throw new Error('Invalid user ID');
       }
 
-      // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!email || !emailRegex.test(email)) {
         throw new Error('Invalid email format');
       }
 
-      // Check for duplicate email
       const existingUser = await User.findOne({ email, _id: { $ne: userId } }, null, { session }).lean();
       if (existingUser) {
         throw new Error('Email already in use');
       }
 
-      // Validate role
       const validRoles = ['client', 'worker', 'admin', 'thekadar', 'contractor', 'consultant'];
       if (!validRoles.includes(role)) {
         throw new Error(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
       }
 
-      // Validate verification status if provided
       const validStatuses = ['pending', 'approved', 'rejected'];
       if (verificationStatus && !validStatuses.includes(verificationStatus)) {
         throw new Error(`Invalid verification status. Must be one of: ${validStatuses.join(', ')}`);
       }
 
-      // Get current user
       const currentUser = await User.findById(userId, null, { session }).lean();
       if (!currentUser) {
         throw new Error('User not found');
       }
 
-      // Update user
+      // Store previous states for comparison
+      const previousVerificationStatus = (await Verification.findOne({ userId }, null, { session })?.status) || 'pending';
+      const previousIsVerified = currentUser.isVerified || false;
+
       const updatedUser = await User.findByIdAndUpdate(
         userId,
         { 
@@ -278,16 +289,13 @@ exports.updateUserByAdmin = async (req, res) => {
           name: name || currentUser.name,
           phone: phone || currentUser.phone,
           role, 
-          isVerified: verificationStatus === 'approved' ? true : (isVerified ?? false)
+          isVerified: verificationStatus === 'approved' ? true : (isVerified ?? false),
         },
         { new: true, runValidators: true, session, lean: true }
       );
 
       let profile = null;
-
-      // Handle profile based on role
       if (role !== 'client') {
-        // Non-client roles need profile
         if (!name || !city || !town || !experience) {
           throw new Error('Name, city, town, and experience are required for non-client roles');
         }
@@ -303,21 +311,19 @@ exports.updateUserByAdmin = async (req, res) => {
             experience,
             skills: skills || [],
             features: features || [],
+            updatedAt: Date.now(),
           },
           { new: true, runValidators: true, upsert: true, session, lean: true }
         );
       } else {
-        // Client role - remove profile if exists
         await Profile.findOneAndDelete({ userId }, { session });
       }
 
-      // Handle verification
       if (role !== 'client' && (verificationStatus || documentType || documentUrl)) {
-        const verificationData = {};
+        const verificationData = { updatedAt: Date.now() };
         if (verificationStatus) verificationData.status = verificationStatus;
         if (documentType) verificationData.documentType = documentType;
         if (documentUrl) verificationData.documentUrl = documentUrl;
-        verificationData.updatedAt = Date.now();
 
         await Verification.findOneAndUpdate(
           { userId },
@@ -325,21 +331,47 @@ exports.updateUserByAdmin = async (req, res) => {
           { new: true, upsert: true, session, lean: true }
         );
       } else if (role === 'client') {
-        // Client role - remove verification if exists
         await Verification.findOneAndDelete({ userId }, { session });
       }
 
-      return { updatedUser, profile }; // Return result for withTransaction
+      // Send FCM notification if verification status or isVerified changes
+      if (updatedUser.fcmToken) {
+        let notificationBody;
+        let notificationTitle = 'Verification Status Update';
+
+        if (role !== 'client' && verificationStatus && verificationStatus !== previousVerificationStatus) {
+          if (verificationStatus === 'approved') {
+            notificationBody = 'Your account has been verified by the admin!';
+          } else if (verificationStatus === 'rejected') {
+            notificationBody = 'Your account verification was rejected. Please contact support.';
+          }
+        } else if (role === 'client' && isVerified !== undefined && isVerified !== previousIsVerified) {
+          notificationBody = isVerified
+            ? 'Your client account has been verified!'
+            : 'Your client account verification status has been updated. Please contact support.';
+        }
+
+        if (notificationBody) {
+          const notificationResult = await sendFCMNotification(
+            updatedUser.fcmToken,
+            notificationTitle,
+            notificationBody
+          );
+          console.log('Notification result:', notificationResult);
+        }
+      } else {
+        console.warn(`No FCM token found for user ${userId}`);
+      }
+
+      return { updatedUser, profile };
     });
 
-    // No need to call session.commitTransaction() as withTransaction handles it
     res.json({
       message: 'User updated successfully',
       user: result.updatedUser,
       profile: result.profile,
     });
   } catch (error) {
-    // Only abort if the transaction is still active
     if (session.inTransaction()) {
       await session.abortTransaction();
     }

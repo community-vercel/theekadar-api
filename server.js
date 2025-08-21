@@ -25,9 +25,6 @@ connectDB();
 
 const app = express();
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
 
 
 app.use(

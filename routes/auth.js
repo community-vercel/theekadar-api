@@ -293,6 +293,34 @@ router.put('/client/:userId', authMiddleware, async (req, res) => {
 });
 
 
+router.post('/update-fcm-token', async (req, res) => {
+  try {
+    const { userId, fcmToken } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    if (!fcmToken) {
+      return res.status(400).json({ message: 'FCM token is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { fcmToken },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'FCM token updated successfully' });
+  } catch (error) {
+    console.error('Error updating FCM token:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 
 
 

@@ -30,6 +30,7 @@ const userSchema = new mongoose.Schema({
   },
   profileImage: { type: String },
   isVerified: { type: Boolean, default: false },
+  fcmToken:  { type: String },
   createdAt: { type: Date, default: Date.now },
   resetPasswordToken: { type: String },
   resetPasswordExpires: { type: Date },
