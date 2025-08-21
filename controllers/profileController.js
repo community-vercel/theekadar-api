@@ -71,7 +71,7 @@ exports.createProfile = async (req, res) => {
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
+    // if (!user.isVerified) return res.status(403).json({ message: 'User not verified' });
 
     const existingProfile = await Profile.findOne({ userId: req.user.userId });
     if (existingProfile) return res.status(400).json({ message: 'Profile already exists' });
