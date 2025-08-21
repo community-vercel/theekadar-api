@@ -296,9 +296,7 @@ exports.updateUserByAdmin = async (req, res) => {
 
       let profile = null;
       if (role !== 'client') {
-        if (!name || !city || !town || !experience) {
-          throw new Error('Name, city, town, and experience are required for non-client roles');
-        }
+      
         
         profile = await Profile.findOneAndUpdate(
           { userId },
