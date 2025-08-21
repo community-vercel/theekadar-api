@@ -10,6 +10,8 @@ const {
   getAllUsers,
   deleteUser,
   updateUserByAdmin,
+  bulkDeleteUser,
+  bulkUpdateUser,
   login
 } = require('../controllers/adminusers');
 const { validate, updateUserSchemas } = require('../middleware/validation');
@@ -25,6 +27,8 @@ router.post('/verify-worker', admin(['admin']), verifyWorker);
 router.get('/pending-verifications', admin(['admin']), getPendingVerifications);
 router.get('/search', admin(['client', 'admin', 'thekedar']), searchUsersByLocation);
 router.get('/all', admin(['admin']), getAllUsers);
+router.post('/bulk-delete', admin(['admin']), bulkDeleteUser);
+router.post('/bulk-update', admin(['admin']), bulkUpdateUser);
 router.delete('/:userId', admin(['admin']), deleteUser);
 router.put('/:userId', admin(['admin']), validate(updateUserSchemas), updateUserByAdmin);
 router.post('/login', login);

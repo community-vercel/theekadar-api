@@ -162,7 +162,7 @@ exports.getAllUsers = async (req, res) => {
     
     // Fetch profiles for additional information
     const profiles = await Profile.find({ userId: { $in: userIds } })
-      .populate('userId', 'email name phone role isVerified')
+      .populate('userId','email name phone city town role isVerified')
       .lean();
     
     // Fetch verifications
@@ -265,7 +265,7 @@ exports.updateUserByAdmin = async (req, res) => {
 
       const validRoles = ['client', 'worker', 'admin', 'thekadar', 'contractor', 'consultant'];
       if (!validRoles.includes(role)) {
-        throw new Error(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
+        throw new Error(`Invalid role. Must be one of thesssss: ${validRoles.join(', ')}`);
       }
 
       const validStatuses = ['pending', 'approved', 'rejected'];
@@ -376,6 +376,177 @@ exports.updateUserByAdmin = async (req, res) => {
       await session.abortTransaction();
     }
     console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  } finally {
+    await session.endSession();
+  }
+};
+// Bulk Delete Users
+exports.bulkDeleteUser = async (req, res) => {
+  const session = await mongoose.startSession();
+
+  try {
+    await session.withTransaction(async () => {
+      const { userIds } = req.body;
+
+      // Validate input
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        throw new Error('Invalid or empty user IDs array');
+      }
+
+      // Validate all user IDs
+      const invalidIds = userIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+      if (invalidIds.length > 0) {
+        throw new Error(`Invalid user IDs: ${invalidIds.join(', ')}`);
+      }
+
+      // Delete users and related data (excluding reviews)
+      const deletedUsers = await User.deleteMany(
+        { _id: { $in: userIds }, role: { $ne: 'admin' } }, // Prevent deleting admin users
+        { session }
+      );
+
+      if (deletedUsers.deletedCount === 0) {
+        throw new Error('No users found to delete');
+      }
+
+      // Delete related data
+      await Promise.all([
+        Profile.deleteMany({ userId: { $in: userIds } }, { session }),
+        Verification.deleteMany({ userId: { $in: userIds } }, { session }),
+        Post.deleteMany({ userId: { $in: userIds } }, { session }),
+        Job.deleteMany({ userId: { $in: userIds } }, { session }),
+        // Add other models here as needed, excluding Review
+      ]);
+
+      res.json({
+        message: `Successfully deleted ${deletedUsers.deletedCount} user(s)`,
+        deletedCount: deletedUsers.deletedCount,
+      });
+    });
+  } catch (error) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    console.error('Error in bulk delete users:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  } finally {
+    await session.endSession();
+  }
+};
+
+// Bulk Update Users
+exports.bulkUpdateUser = async (req, res) => {
+  const session = await mongoose.startSession();
+
+  try {
+    const result = await session.withTransaction(async () => {
+      const { userIds, updates } = req.body;
+
+      // Validate input
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        throw new Error('Invalid or empty user IDs array');
+      }
+
+      const invalidIds = userIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+      if (invalidIds.length > 0) {
+        throw new Error(`Invalid user IDs: ${invalidIds.join(', ')}`);
+      }
+
+      const { role, isVerified, verificationStatus } = updates || {};
+
+      // Validate updates
+      const validRoles = ['client', 'worker', 'admin', 'thekadar', 'contractor', 'consultant'];
+      if (role && !validRoles.includes(role)) {
+        throw new Error(`Invalid role. Must be one of thessse: ${validRoles.join(', ')}`);
+      }
+
+      const validStatuses = ['pending', 'approved', 'rejected'];
+      if (verificationStatus && !validStatuses.includes(verificationStatus)) {
+        throw new Error(`Invalid verification status. Must be one of: ${validStatuses.join(', ')}`);
+      }
+
+      // Update users
+      const updateData = {};
+      if (role) updateData.role = role;
+      if (typeof isVerified === 'boolean') {
+        updateData.isVerified = verificationStatus === 'approved' ? true : isVerified;
+      }
+
+      const updatedUsers = await User.updateMany(
+        { _id: { $in: userIds }, role: { $ne: 'admin' } }, // Prevent updating admin users
+        updateData,
+        { new: true, runValidators: true, session }
+      );
+
+      if (updatedUsers.matchedCount === 0) {
+        throw new Error('No users found to update');
+      }
+
+      let profiles = [];
+      let verifications = [];
+
+      // Handle profiles and verifications for non-client roles
+      if (role && role !== 'client') {
+        if (verificationStatus) {
+          verifications = await Verification.updateMany(
+            { userId: { $in: userIds } },
+            { status: verificationStatus, updatedAt: Date.now() },
+            { new: true, upsert: true, session }
+          );
+        }
+      } else if (role === 'client') {
+        // Delete profiles and verifications for client role
+        await Promise.all([
+          Profile.deleteMany({ userId: { $in: userIds } }, { session }),
+          Verification.deleteMany({ userId: { $in: userIds } }, { session }),
+        ]);
+      }
+
+      // Send FCM notifications for updated users
+      const users = await User.find({ _id: { $in: userIds } }, null, { session }).lean();
+      for (const user of users) {
+        if (user.fcmToken && (role || isVerified !== undefined || verificationStatus)) {
+          let notificationBody;
+          let notificationTitle = 'Account Update';
+
+          if (role && role !== user.role) {
+            notificationBody = `Your account role has been updated to ${role}.`;
+          } else if (typeof isVerified !== 'undefined' && isVerified !== user.isVerified) {
+            notificationBody = isVerified
+              ? 'Your account has been verified!'
+              : 'Your account verification status has been updated.';
+          } else if (role !== 'client' && verificationStatus && verificationStatus !== 'pending') {
+            notificationBody =
+              verificationStatus === 'approved'
+                ? 'Your verification has been approved!'
+                : 'Your verification was rejected. Please contact support.';
+            notificationTitle = 'Verification Status Update';
+          }
+
+          if (notificationBody) {
+            const notificationResult = await sendFCMNotification(
+              user.fcmToken,
+              notificationTitle,
+              notificationBody
+            );
+            console.log(`Notification sent to user ${user._id}:`, notificationResult);
+          }
+        }
+      }
+
+      return { updatedCount: updatedUsers.matchedCount, profiles, verifications };
+    });
+
+    res.json({
+      message: `Successfully updated ${result.updatedCount} user(s)`,
+      updatedCount: result.updatedCount,
+    });
+  } catch (error) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    console.error('Error in bulk update users:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   } finally {
     await session.endSession();

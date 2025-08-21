@@ -14,12 +14,6 @@ const mongoose = require('mongoose');
 const { OAuth2Client } = require('google-auth-library');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-// Existing routes
-
-
-
-// Updated backend endpoint to handle additional user data from Flutter
 router.post('/google/mobile', async (req, res) => {
   try {
     const { idToken, name, phone, role } = req.body;
@@ -36,7 +30,6 @@ router.post('/google/mobile', async (req, res) => {
     let isNewUser = false;
 
     if (!user) {
-      // Check if user exists with the same email
       const existingEmailUser = await User.findOne({ email: payload.email });
       if (existingEmailUser) {
         return res.status(400).json({
@@ -46,7 +39,6 @@ router.post('/google/mobile', async (req, res) => {
         });
       }
 
-      // Check if user exists with the same phone number (if provided)
       if (phone) {
         const existingPhoneUser = await User.findOne({ phone });
         if (existingPhoneUser) {
