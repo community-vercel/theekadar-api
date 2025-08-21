@@ -26,7 +26,7 @@ const userSchema = Joi.object({
     zip: Joi.string().allow(''),
     country: Joi.string().allow(''),
   }).optional(),
-  role: Joi.string().valid('client', 'worker', 'admin', 'thekedar').default('client'),
+  role: Joi.string().valid('client', 'worker', 'admin','contractor','thekedar').default('client'),
   location: Joi.object({
     type: Joi.string().valid('Point').default('Point'),
     coordinates: Joi.array().items(Joi.number()).length(2).optional(),
@@ -52,7 +52,7 @@ const updateUserSchema = Joi.object({
 
 const updateUserSchemas = Joi.object({
   email: Joi.string().email().optional(),
-  role: Joi.string().valid('client', 'worker', 'admin', 'thekedar').optional(),
+  role: Joi.string().valid('client', 'worker', 'admin','contractor', 'thekedar').optional(),
   isVerified: Joi.boolean().optional(),
   name: Joi.string().optional(),
   phone: Joi.string().optional(),
