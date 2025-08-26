@@ -3,40 +3,54 @@ const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const Profile = require('../models/profile');
 const nodemailer = require('nodemailer');
 
 // Validation schema for registration
 const registerSchema = Joi.object({
-  email: Joi.string().email().when('phone', {
-    is: Joi.exist(),
-    then: Joi.forbidden(),
-    otherwise: Joi.required(),
-  }),
-  phone: Joi.string().when('email', {
-    is: Joi.exist(),
-    then: Joi.forbidden(),
-    otherwise: Joi.required(),
-  }),
+  email: Joi.string().email().allow('').optional(),
+  phone: Joi.string()
+    .pattern(/^[0-9]{10,15}$/)
+    .allow('')
+    .optional(),
   password: Joi.string().min(6).required(),
   name: Joi.string().required(),
   role: Joi.string()
     .valid('client', 'worker', 'thekadar', 'contractor', 'consultant', 'admin')
     .required(),
+  tempUserId: Joi.string().optional(),
+}).custom((value, helpers) => {
+  if (!value.email && !value.phone) {
+    return helpers.error('any.custom', {
+      message: 'Either email or phone is required',
+    });
+  }
+  if (value.email && value.phone) {
+    return helpers.error('any.custom', {
+      message: 'Provide either email or phone, not both',
+    });
+  }
+  return value;
 });
 
 // Validation schema for email/phone uniqueness
 const validateUserSchema = Joi.object({
-  email: Joi.string().email().when('phone', {
-    is: Joi.exist(),
-    then: Joi.forbidden(),
-    otherwise: Joi.required(),
-  }),
-  phone: Joi.string().when('email', {
-    is: Joi.exist(),
-    then: Joi.forbidden(),
-    otherwise: Joi.required(),
-  }),
+  email: Joi.string().email().allow('').optional(),
+  phone: Joi.string()
+    .pattern(/^[0-9]{10,15}$/)
+    .allow('')
+    .optional(),
+}).custom((value, helpers) => {
+  if (!value.email && !value.phone) {
+    return helpers.error('any.custom', {
+      message: 'Either email or phone is required',
+    });
+  }
+  if (value.email && value.phone) {
+    return helpers.error('any.custom', {
+      message: 'Provide either email or phone, not both',
+    });
+  }
+  return value;
 });
 
 // Joi schema for login validation
@@ -50,6 +64,13 @@ exports.sendEmailOTP = async (req, res) => {
   const { email } = req.body;
 
   try {
+    // Validate email
+    const schema = Joi.object({
+      email: Joi.string().email().required(),
+    });
+    const { error } = schema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
     // Check if email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -98,6 +119,13 @@ exports.verifyEmailOTP = async (req, res) => {
   const { tempUserId, code } = req.body;
 
   try {
+    const schema = Joi.object({
+      tempUserId: Joi.string().required(),
+      code: Joi.string().length(6).required(),
+    });
+    const { error } = schema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.details[0].message });
+
     const user = await User.findOne({
       _id: tempUserId,
       emailVerificationCode: code,
