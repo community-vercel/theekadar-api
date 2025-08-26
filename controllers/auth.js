@@ -3,6 +3,7 @@ const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const TempUser = require('../models/newuser');
 const nodemailer = require('nodemailer');
 
 // Validation schema for registration
@@ -71,17 +72,23 @@ exports.sendEmailOTP = async (req, res) => {
     const { error } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    // Check if email already exists
+    // Check if email already exists in User collection
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already exists' });
     }
 
+    // Check if email is already in TempUser (to avoid duplicates)
+    const existingTempUser = await TempUser.findOne({ email });
+    if (existingTempUser) {
+      await existingTempUser.deleteOne();
+    }
+
     // Generate a 6-digit OTP code
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Create a temporary user record for OTP storage
-    const tempUser = new User({
+    // Create a temporary user record
+    const tempUser = new TempUser({
       email,
       emailVerificationCode: otpCode,
       emailVerificationExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
@@ -126,23 +133,27 @@ exports.verifyEmailOTP = async (req, res) => {
     const { error } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const user = await User.findOne({
+    const tempUser = await TempUser.findOne({
       _id: tempUserId,
       emailVerificationCode: code,
       emailVerificationExpires: { $gt: Date.now() },
     });
 
-    if (!user) {
+    if (!tempUser) {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    // Mark as verified
-    user.isVerified = true;
-    user.emailVerificationCode = undefined;
-    user.emailVerificationExpires = undefined;
+    // Create a User document with verified status
+    const user = new User({
+      email: tempUser.email,
+      isVerified: true,
+    });
     await user.save();
 
-    res.status(200).json({ message: 'OTP verified successfully' });
+    // Delete the TempUser record
+    await tempUser.deleteOne();
+
+    res.status(200).json({ message: 'OTP verified successfully', userId: user._id });
   } catch (error) {
     console.error('Error verifying OTP:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -160,6 +171,8 @@ exports.validateUser = async (req, res) => {
     if (email) {
       const existingEmail = await User.findOne({ email });
       if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
+      const existingTempUser = await TempUser.findOne({ email });
+      if (existingTempUser) return res.status(400).json({ message: 'Email is pending verification' });
     } else if (phone) {
       const existingPhone = await User.findOne({ phone });
       if (existingPhone) return res.status(400).json({ message: 'Phone number already exists' });
@@ -180,14 +193,14 @@ exports.register = async (req, res) => {
   const { email, phone, password, name, role, tempUserId } = req.body;
 
   try {
-    // Find temporary user (for email OTP) or validate phone
+    // Find user (for email or phone OTP)
     let user;
     if (tempUserId) {
       user = await User.findOne({ _id: tempUserId, isVerified: true });
-      if (!user) return res.status(400).json({ message: 'OTP not verified' });
+      if (!user) return res.status(400).json({ message: 'Email OTP not verified' });
     } else if (phone) {
       user = await User.findOne({ phone, isVerified: true });
-      if (!user) return res.status(400).json({ message: 'Phone not verified' });
+      if (!user) return res.status(400).json({ message: 'Phone OTP not verified' });
     } else {
       return res.status(400).json({ message: 'Email or phone required' });
     }
@@ -196,7 +209,7 @@ exports.register = async (req, res) => {
     user.name = name;
     user.role = role;
     user.password = await bcrypt.hash(password, 10);
-    user.isVerified = true; // Already verified via OTP
+    user.isVerified = true;
     await user.save();
 
     // Generate JWT
