@@ -188,11 +188,19 @@ exports.register = async (req, res) => {
   const { email, phone, password, name, role, tempUserId } = req.body;
 
   try {
+    console.log('Register request body:', req.body); // Debug log
     let user;
     if (email && tempUserId) {
       // Email-based registration
       const tempUser = await TempUser.findOne({ _id: tempUserId, isVerified: true });
-      if (!tempUser) return res.status(400).json({ message: 'Email OTP not verified' });
+      if (!tempUser) {
+        console.log('TempUser not found or not verified for tempUserId:', tempUserId);
+        return res.status(400).json({ message: 'Email OTP not verified' });
+      }
+      if (tempUser.email !== email) {
+        console.log('Email mismatch: tempUser.email=', tempUser.email, 'provided email=', email);
+        return res.status(400).json({ message: 'Email does not match verified TempUser' });
+      }
 
       // Create new User document
       user = new User({
@@ -227,6 +235,7 @@ exports.register = async (req, res) => {
         await user.save();
       }
     } else {
+      console.log('Neither email nor phone provided in register request');
       return res.status(400).json({ message: 'Email or phone required' });
     }
 
@@ -247,7 +256,7 @@ exports.register = async (req, res) => {
       phone: user.phone,
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in register:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
