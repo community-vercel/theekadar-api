@@ -3,7 +3,7 @@ const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const TempUser = require('../models/newuser');
+const TempUser = require('../models/TempUser');
 const nodemailer = require('nodemailer');
 
 // Validation schema for registration
@@ -92,6 +92,7 @@ exports.sendEmailOTP = async (req, res) => {
       email,
       emailVerificationCode: otpCode,
       emailVerificationExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
+      isVerified: false,
     });
     await tempUser.save();
 
@@ -143,17 +144,11 @@ exports.verifyEmailOTP = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    // Create a User document with verified status
-    const user = new User({
-      email: tempUser.email,
-      isVerified: true,
-    });
-    await user.save();
+    // Mark TempUser as verified
+    tempUser.isVerified = true;
+    await tempUser.save();
 
-    // Delete the TempUser record
-    await tempUser.deleteOne();
-
-    res.status(200).json({ message: 'OTP verified successfully', userId: user._id });
+    res.status(200).json({ message: 'OTP verified successfully', tempUserId: tempUser._id });
   } catch (error) {
     console.error('Error verifying OTP:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -193,24 +188,47 @@ exports.register = async (req, res) => {
   const { email, phone, password, name, role, tempUserId } = req.body;
 
   try {
-    // Find user (for email or phone OTP)
     let user;
-    if (tempUserId) {
-      user = await User.findOne({ _id: tempUserId, isVerified: true });
-      if (!user) return res.status(400).json({ message: 'Email OTP not verified' });
+    if (email && tempUserId) {
+      // Email-based registration
+      const tempUser = await TempUser.findOne({ _id: tempUserId, isVerified: true });
+      if (!tempUser) return res.status(400).json({ message: 'Email OTP not verified' });
+
+      // Create new User document
+      user = new User({
+        email,
+        name,
+        role,
+        password: await bcrypt.hash(password, 10),
+        isVerified: true,
+      });
+      await user.save();
+
+      // Delete TempUser record
+      await tempUser.deleteOne();
     } else if (phone) {
+      // Phone-based registration
       user = await User.findOne({ phone, isVerified: true });
-      if (!user) return res.status(400).json({ message: 'Phone OTP not verified' });
+      if (!user) {
+        // Create new User document if not exists
+        user = new User({
+          phone,
+          name,
+          role,
+          password: await bcrypt.hash(password, 10),
+          isVerified: true,
+        });
+        await user.save();
+      } else {
+        // Update existing user
+        user.name = name;
+        user.role = role;
+        user.password = await bcrypt.hash(password, 10);
+        await user.save();
+      }
     } else {
       return res.status(400).json({ message: 'Email or phone required' });
     }
-
-    // Update user with full details
-    user.name = name;
-    user.role = role;
-    user.password = await bcrypt.hash(password, 10);
-    user.isVerified = true;
-    await user.save();
 
     // Generate JWT
     const token = jwt.sign(
