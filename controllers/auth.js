@@ -8,17 +8,35 @@ const nodemailer = require('nodemailer');
 
 // Validation schema for registration
 const registerSchema = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string().email().when('phone', {
+    is: Joi.exist(),
+    then: Joi.forbidden(),
+    otherwise: Joi.required(),
+  }),
+  phone: Joi.string().when('email', {
+    is: Joi.exist(),
+    then: Joi.forbidden(),
+    otherwise: Joi.required(),
+  }),
   password: Joi.string().min(6).required(),
   name: Joi.string().required(),
-  phone: Joi.string().optional(),
-  role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant', 'admin').required(),
+  role: Joi.string()
+    .valid('client', 'worker', 'thekadar', 'contractor', 'consultant', 'admin')
+    .required(),
 });
 
 // Validation schema for email/phone uniqueness
 const validateUserSchema = Joi.object({
-  email: Joi.string().email().required(),
-  phone: Joi.string().optional(),
+  email: Joi.string().email().when('phone', {
+    is: Joi.exist(),
+    then: Joi.forbidden(),
+    otherwise: Joi.required(),
+  }),
+  phone: Joi.string().when('email', {
+    is: Joi.exist(),
+    then: Joi.forbidden(),
+    otherwise: Joi.required(),
+  }),
 });
 
 // Joi schema for login validation
@@ -27,7 +45,83 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
-// Validate email/phone uniqueness
+// Send email OTP for registration
+exports.sendEmailOTP = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Check if email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    // Generate a 6-digit OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Create a temporary user record for OTP storage
+    const tempUser = new User({
+      email,
+      emailVerificationCode: otpCode,
+      emailVerificationExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
+    });
+    await tempUser.save();
+
+    // Configure Nodemailer
+    const transporter = nodemailer.createTransport({
+      service: 'Gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Email content
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Your Registration OTP Code',
+      text: `Your registration OTP code is: ${otpCode}. This code will expire in 10 minutes.`,
+      html: `<p>Your registration OTP code is:</p><h2>${otpCode}</h2><p>This code will expire in 10 minutes.</p>`,
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: 'OTP sent to email', tempUserId: tempUser._id });
+  } catch (error) {
+    console.error('Error sending email OTP:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Verify email OTP
+exports.verifyEmailOTP = async (req, res) => {
+  const { tempUserId, code } = req.body;
+
+  try {
+    const user = await User.findOne({
+      _id: tempUserId,
+      emailVerificationCode: code,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    // Mark as verified
+    user.isVerified = true;
+    user.emailVerificationCode = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'OTP verified successfully' });
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Validate email or phone uniqueness
 exports.validateUser = async (req, res) => {
   const { error } = validateUserSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -35,17 +129,15 @@ exports.validateUser = async (req, res) => {
   const { email, phone } = req.body;
 
   try {
-    // Check if email already exists
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
-
-    // Check if phone already exists
-    if (phone) {
+    if (email) {
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
+    } else if (phone) {
       const existingPhone = await User.findOne({ phone });
       if (existingPhone) return res.status(400).json({ message: 'Phone number already exists' });
     }
 
-    res.status(200).json({ message: 'Email and phone are available' });
+    res.status(200).json({ message: 'Email or phone is available' });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -57,28 +149,26 @@ exports.register = async (req, res) => {
   const { error } = registerSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
-  const { email, password, name, phone, role } = req.body;
+  const { email, phone, password, name, role, tempUserId } = req.body;
 
   try {
-    // Double-check email/phone uniqueness (optional, as client should have validated)
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: 'Email already exists' });
+    // Find temporary user (for email OTP) or validate phone
+    let user;
+    if (tempUserId) {
+      user = await User.findOne({ _id: tempUserId, isVerified: true });
+      if (!user) return res.status(400).json({ message: 'OTP not verified' });
+    } else if (phone) {
+      user = await User.findOne({ phone, isVerified: true });
+      if (!user) return res.status(400).json({ message: 'Phone not verified' });
+    } else {
+      return res.status(400).json({ message: 'Email or phone required' });
+    }
 
-    const existingPhone = await User.findOne({ phone });
-    if (existingPhone) return res.status(400).json({ message: 'Phone number already exists' });
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user with isVerified set to true (since OTP is verified)
-    const user = new User({
-      email,
-      password: hashedPassword,
-      name,
-      phone,
-      role,
-      isVerified: true, // OTP verification is assumed to be done
-    });
+    // Update user with full details
+    user.name = name;
+    user.role = role;
+    user.password = await bcrypt.hash(password, 10);
+    user.isVerified = true; // Already verified via OTP
     await user.save();
 
     // Generate JWT
@@ -94,6 +184,7 @@ exports.register = async (req, res) => {
       isVerified: user.isVerified,
       role: user.role,
       name: user.name,
+      email: user.email,
       phone: user.phone,
     });
   } catch (error) {
@@ -110,28 +201,23 @@ exports.login = async (req, res) => {
   const { identifier, password } = req.body;
 
   try {
-    // Find user by email or phone
     const user = await User.findOne({
       $or: [{ email: identifier }, { phone: identifier }],
     });
 
     if (!user) return res.status(400).json({ message: 'Invalid email or phone number' });
 
-    // Check if user is a Google user (no password)
     if (user.googleId && !user.password) {
       return res.status(400).json({ message: 'Please use Google Sign-In for this account' });
     }
 
-    // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    // Check if user is verified
     if (!user.isVerified) {
-      return res.status(400).json({ message: 'Phone number not verified' });
+      return res.status(400).json({ message: 'Account not verified' });
     }
 
-    // Generate JWT
     const token = jwt.sign(
       { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
@@ -143,6 +229,7 @@ exports.login = async (req, res) => {
       isVerified: user.isVerified,
       role: user.role,
       name: user.name,
+      email: user.email,
       phone: user.phone,
     });
   } catch (error) {
@@ -201,14 +288,13 @@ exports.verifyResetCode = async (req, res) => {
     const user = await User.findOne({
       email,
       resetPasswordCode: code,
-      resetPasswordExpires: { $gt: Date.now() }, // Not expired
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!user) {
       return res.status(400).json({ message: 'Invalid or expired code' });
     }
 
-    // Mark as verified
     user.resetPasswordVerified = true;
     await user.save();
 
@@ -230,10 +316,7 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Password reset not verified' });
     }
 
-    // Hash password
     user.password = await bcrypt.hash(password, 10);
-
-    // Clear reset fields
     user.resetPasswordCode = undefined;
     user.resetPasswordExpires = undefined;
     user.resetPasswordVerified = undefined;

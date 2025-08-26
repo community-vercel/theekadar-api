@@ -131,7 +131,8 @@ router.post('/google/mobile', async (req, res) => {
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/validate-user', authController.validateUser); // New endpoint
-
+router.post('/send-email-otp', authController.sendEmailOTP);
+router.post('/verify-email-otp', authController.verifyEmailOTP);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-reset-code', authController.verifyResetCode);
 router.post('/reset-password', authController.resetPassword);
