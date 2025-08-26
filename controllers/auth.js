@@ -2,9 +2,7 @@
 const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
 const User = require('../models/User');
-
 const TempUser = require('../models/newuser');
 const nodemailer = require('nodemailer');
 
@@ -143,6 +141,7 @@ exports.verifyEmailOTP = async (req, res) => {
     });
 
     if (!tempUser) {
+      console.log('Invalid or expired OTP for tempUserId:', tempUserId);
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
@@ -202,6 +201,13 @@ exports.register = async (req, res) => {
       if (tempUser.email !== email) {
         console.log('Email mismatch: tempUser.email=', tempUser.email, 'provided email=', email);
         return res.status(400).json({ message: 'Email does not match verified TempUser' });
+      }
+
+      // Check if User already exists (edge case)
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        console.log('User already exists for email:', email);
+        return res.status(400).json({ message: 'Email already exists' });
       }
 
       // Create new User document
