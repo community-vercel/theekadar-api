@@ -2,7 +2,9 @@
 const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+
 const User = require('../models/User');
+
 const TempUser = require('../models/newuser');
 const nodemailer = require('nodemailer');
 
