@@ -115,6 +115,7 @@ exports.sendEmailOTP = async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
+    console.log('Email OTP sent for email:', email, 'tempUserId:', tempUser._id);
     res.status(200).json({ message: 'OTP sent to email', tempUserId: tempUser._id });
   } catch (error) {
     console.error('Error sending email OTP:', error);
@@ -141,13 +142,21 @@ exports.verifyEmailOTP = async (req, res) => {
     });
 
     if (!tempUser) {
-      console.log('Invalid or expired OTP for tempUserId:', tempUserId);
+      console.log('Invalid or expired OTP for tempUserId:', tempUserId, 'code:', code);
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
     // Mark TempUser as verified
     tempUser.isVerified = true;
     await tempUser.save();
+    console.log('TempUser verified for tempUserId:', tempUserId, 'email:', tempUser.email);
+
+    // Verify the save operation
+    const verifiedTempUser = await TempUser.findOne({ _id: tempUserId });
+    if (!verifiedTempUser || !verifiedTempUser.isVerified) {
+      console.error('Failed to save isVerified=true for tempUserId:', tempUserId);
+      return res.status(500).json({ message: 'Failed to verify OTP due to server error' });
+    }
 
     res.status(200).json({ message: 'OTP verified successfully', tempUserId: tempUser._id });
   } catch (error) {
@@ -189,13 +198,21 @@ exports.register = async (req, res) => {
   const { email, phone, password, name, role, tempUserId } = req.body;
 
   try {
-    console.log('Register request body:', req.body); // Debug log
+    console.log('Register request body:', req.body);
     let user;
     if (email && tempUserId) {
       // Email-based registration
-      const tempUser = await TempUser.findOne({ _id: tempUserId, isVerified: true });
+      // Retry to handle potential race condition
+      let tempUser;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        tempUser = await TempUser.findOne({ _id: tempUserId, isVerified: true });
+        if (tempUser) break;
+        console.log(`Attempt ${attempt}: TempUser not found or not verified for tempUserId: ${tempUserId}`);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+      }
+
       if (!tempUser) {
-        console.log('TempUser not found or not verified for tempUserId:', tempUserId);
+        console.log('TempUser not found or not verified after retries for tempUserId:', tempUserId);
         return res.status(400).json({ message: 'Email OTP not verified' });
       }
       if (tempUser.email !== email) {
@@ -221,7 +238,8 @@ exports.register = async (req, res) => {
       await user.save();
 
       // Delete TempUser record
-      await tempUser.deleteOne();
+      await TempUser.deleteOne({ _id: tempUserId });
+      console.log('TempUser deleted for tempUserId:', tempUserId);
     } else if (phone) {
       // Phone-based registration
       user = await User.findOne({ phone, isVerified: true });
