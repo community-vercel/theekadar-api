@@ -3,22 +3,23 @@ const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-
 const Profile = require('../models/profile');
-const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 // Validation schema for registration
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
-  name: Joi.string().required(), // New field: required
-  phone: Joi.string().optional(), // New field: optional
-  role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant','admin').required(),
+  name: Joi.string().required(),
+  phone: Joi.string().optional(),
+  role: Joi.string().valid('client', 'worker', 'thekadar', 'contractor', 'consultant', 'admin').required(),
 });
 
-  
-
+// Validation schema for email/phone uniqueness
+const validateUserSchema = Joi.object({
+  email: Joi.string().email().required(),
+  phone: Joi.string().optional(),
+});
 
 // Joi schema for login validation
 const loginSchema = Joi.object({
@@ -26,77 +27,131 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+// Validate email/phone uniqueness
+exports.validateUser = async (req, res) => {
+  const { error } = validateUserSchema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
 
-// controllers/authController.js
+  const { email, phone } = req.body;
+
+  try {
+    // Check if email already exists
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
+
+    // Check if phone already exists
+    if (phone) {
+      const existingPhone = await User.findOne({ phone });
+      if (existingPhone) return res.status(400).json({ message: 'Phone number already exists' });
+    }
+
+    res.status(200).json({ message: 'Email and phone are available' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Register user (called after OTP verification)
 exports.register = async (req, res) => {
   const { error } = registerSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   const { email, password, name, phone, role } = req.body;
 
-  // Check if email already exists
-  const existingUser = await User.findOne({ email });
-  if (existingUser) return res.status(400).json({ message: 'User with this email already exists' });
+  try {
+    // Double-check email/phone uniqueness (optional, as client should have validated)
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ message: 'Email already exists' });
 
-  // Check if phone already exists
-  const existingPhone = await User.findOne({ phone });
-  if (existingPhone) return res.status(400).json({ message: 'User with this phone number already exists' });
+    const existingPhone = await User.findOne({ phone });
+    if (existingPhone) return res.status(400).json({ message: 'Phone number already exists' });
 
-  // Hash password
-  const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Create user
-  const user = new User({
-    email,
-    password: hashedPassword,
-    name,
-    phone,
-    role,
-  });
-  await user.save();
+    // Create user with isVerified set to true (since OTP is verified)
+    const user = new User({
+      email,
+      password: hashedPassword,
+      name,
+      phone,
+      role,
+      isVerified: true, // OTP verification is assumed to be done
+    });
+    await user.save();
 
-  // Generate JWT
-  const token = jwt.sign(
-    { userId: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+    // Generate JWT
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-
-  res.json({ token, userId: user._id, isVerified: user.isVerified,role:user.role,name:user.name,phone:user.phone });
+    res.json({
+      token,
+      userId: user._id,
+      isVerified: user.isVerified,
+      role: user.role,
+      name: user.name,
+      phone: user.phone,
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
 };
 
+// Login
 exports.login = async (req, res) => {
   const { error } = loginSchema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
 
   const { identifier, password } = req.body;
 
-  // Find user by email or phone
-  const user = await User.findOne({
-    $or: [
-      { email: identifier },
-      { phone: identifier },
-    ],
-  });
+  try {
+    // Find user by email or phone
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { phone: identifier }],
+    });
 
-  if (!user) return res.status(400).json({ message: 'Invalid email or phone number' });
+    if (!user) return res.status(400).json({ message: 'Invalid email or phone number' });
 
-  // Check if user is a Google user (no password)
-  if (user.googleId && !user.password) {
-    return res.status(400).json({ message: 'Please use Google Sign-In for this account' });
+    // Check if user is a Google user (no password)
+    if (user.googleId && !user.password) {
+      return res.status(400).json({ message: 'Please use Google Sign-In for this account' });
+    }
+
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(400).json({ message: 'Phone number not verified' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({
+      token,
+      userId: user._id,
+      isVerified: user.isVerified,
+      role: user.role,
+      name: user.name,
+      phone: user.phone,
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
-
-  // Verify password
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
-
-  // Generate JWT
-  const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, userId: user._id, isVerified: user.isVerified,role:user.role,name:user.name,phone:user.phone });
 };
 
-
+// Forgot Password
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
 
@@ -132,12 +187,13 @@ exports.forgotPassword = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
     res.status(200).json({ message: 'Reset code sent to email' });
-
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Verify Reset Code
 exports.verifyResetCode = async (req, res) => {
   const { email, code } = req.body;
 
@@ -152,19 +208,18 @@ exports.verifyResetCode = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired code' });
     }
 
-    // Mark as verified (optional: store a short-lived token instead)
+    // Mark as verified
     user.resetPasswordVerified = true;
     await user.save();
 
     res.status(200).json({ message: 'Code verified successfully' });
-
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-
+// Reset Password
 exports.resetPassword = async (req, res) => {
   const { email, password } = req.body;
 
@@ -186,12 +241,8 @@ exports.resetPassword = async (req, res) => {
     await user.save();
 
     res.status(200).json({ message: 'Password reset successfully' });
-
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-
-
