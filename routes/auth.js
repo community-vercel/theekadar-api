@@ -176,6 +176,7 @@ router.get('/:userId', authMiddleware, async (req, res) => {
       address: profile.address || null,
       verificationStatus: profile.verificationStatus || null,
     };
+    
 
     res.status(200).json({ message: 'Profile details retrieved successfully', profile: response });
   } catch (error) {
