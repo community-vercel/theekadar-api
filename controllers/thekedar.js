@@ -46,7 +46,7 @@ const createThekedarProfile = async (req, res) => {
 const getThekedarProfile = async (req, res) => {
   try {
     const thekedar = await Thekedar.findOne({ user: req.user.id })
-      .populate('user', 'name email phone')
+      .populate('profiles', 'name email phone')
       .populate('workers', 'skills experience hourlyRate');
     if (!thekedar) {
       return res.status(404).json({ error: 'Thekedar profile not found' });
@@ -66,7 +66,7 @@ const addWorkerToTeam = async (req, res) => {
       return res.status(404).json({ error: 'Thekedar profile not found' });
     }
 
-    const worker = await Worker.findById(workerId).populate('user');
+    const worker = await Worker.findById(workerId).populate('profiles');
     if (!worker || worker.user.role !== 'worker') {
       return res.status(404).json({ error: 'Worker not found' });
     }
