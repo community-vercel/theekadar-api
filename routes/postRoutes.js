@@ -76,8 +76,8 @@ router.get('/:postId', async (req, res) => {
       user: {
         _id: post.userId._id,
         name: post.userId.name,
-        email: post.userId.email,
-        phone: post.userId.phone,
+        email: post.userId.email || post.userId.profile ? post.userId.profile.email : null,
+        phone: post.userId.phone || post.userId.profile ? post.userId.profile.phone : null,
         role: post.userId.role,
         isVerified: post.userId.isVerified,
         createdAt: post.userId.createdAt,
@@ -150,8 +150,8 @@ router.get('/category/:category', async (req, res) => {
           userId: {
             _id: '$user._id',
             name: '$user.name',
-            email: '$user.email',
-            phone: '$user.phone',
+            email: '$user.email'  || '$profile.email' || null,
+            phone: '$user.phone' || '$profile.phone' || null,
             role: '$user.role',
             isVerified: '$user.isVerified',
             profileImage: { $ifNull: ['$profile.logo', null] },

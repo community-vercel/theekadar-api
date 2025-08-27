@@ -287,7 +287,7 @@ exports.updateUserByAdmin = async (req, res) => {
         { 
           email, 
           name: name || currentUser.name,
-          phone: phone || currentUser.phone,
+          phone: phone || currentUser.phone ,
           role, 
           isVerified: verificationStatus === 'approved' ? true : (isVerified ?? false),
         },
