@@ -40,7 +40,7 @@ router.get('/:postId', async (req, res) => {
         populate: {
           path: 'profile',
           model: 'Profile',
-          select: 'email phonelogo skills experience callCount city town address verificationStatus rating',
+          select: 'email phone logo skills experience callCount city town address verificationStatus rating',
         },
       });
 
