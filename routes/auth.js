@@ -160,7 +160,7 @@ router.get('/:userId', authMiddleware, async (req, res) => {
       _id: profile.userId._id,
       name: profile.userId.name,
       email: profile.userId.email,
-      phone: profile.userId.phone,
+      phone: profile.userId.phone || profile.phone || null,
       role: profile.userId.role,
       isVerified: profile.userId.isVerified,
       createdAt: profile.userId.createdAt,
