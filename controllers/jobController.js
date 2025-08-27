@@ -62,7 +62,7 @@ exports.getJob = async (req, res) => {
         populate: {
           path: 'profile',
           model: 'Profile',
-          select: 'logo skills experience callCount city town address verificationStatus',
+          select: 'phone email logo skills experience callCount city town address verificationStatus',
         },
       });
 
@@ -130,7 +130,7 @@ exports.getAllJobs = async (req, res) => {
         populate: {
           path: 'profile',
           model: 'Profile',
-          select: 'logo city town verificationStatus',
+          select: 'email phone logo city town verificationStatus',
         },
       })
       .sort({ [sort]: order === 'desc' ? -1 : 1 })
@@ -153,8 +153,8 @@ exports.getAllJobs = async (req, res) => {
       user: {
         _id: job.userId._id,
         name: job.userId.name,
-        email: job.userId.email || job.userId.profile ? job.userId.profile.email : null,
-        phone: job.userId.phone || job.userId.profile ? job.userId.profile.phone : null,
+        email:job.userId.profile ? job.userId.profile.email : null,
+        phone: job.userId.profile ? job.userId.profile.phone : null,
         role: job.userId.role,
         isVerified: job.userId.isVerified,
         profileImage: job.userId.profile ? job.userId.profile.logo : null,
@@ -268,7 +268,7 @@ exports.getUserJobs = async (req, res) => {
       { $unwind: '$user' },
       {
         $project: {
-          jobId: '$_id',
+          _id: 1, // Include _id for jobId
           title: 1,
           description: 1,
           category: 1,
@@ -278,10 +278,18 @@ exports.getUserJobs = async (req, res) => {
           skillsRequired: 1,
           createdAt: 1,
           updatedAt: 1,
-          name: '$user.name',
-          profileImage: { $ifNull: ['$profile.logo', null] },
-          address: { $ifNull: ['$profile.address', null] },
-          experience: { $ifNull: ['$profile.experience', null] },
+          user: {
+            _id: '$user._id',
+            name: '$user.name',
+            email: { $ifNull: ['$profile.email', '$user.email', null] },
+            phone: { $ifNull: ['$profile.phone', '$user.phone', null] },
+            profileImage: { $ifNull: ['$profile.logo', null] },
+            city: { $ifNull: ['$profile.city', '$user.city', null] },
+            town: { $ifNull: ['$profile.town', '$user.town', null] },
+            address: { $ifNull: ['$profile.address', null] },
+            verificationStatus: { $ifNull: ['$user.verificationStatus', null] },
+            experience: { $ifNull: ['$profile.experience', null] },
+          },
         },
       },
     ]);
