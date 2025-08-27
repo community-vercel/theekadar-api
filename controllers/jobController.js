@@ -88,7 +88,7 @@ exports.getJob = async (req, res) => {
           _id: job.userId._id,
           name: job.userId.name,
           email: job.userId.email,
-          phone: job.userId.phone,
+          phone: job.userId.phone || job.userId.profile ? job.userId.profile.phone : null,
           role: job.userId.role,
           isVerified: job.userId.isVerified,
           createdAt: job.userId.createdAt,
