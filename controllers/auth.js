@@ -286,6 +286,81 @@ exports.register = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+exports.adminregister = async (req, res) => {
+ 
+  const { email, phone, password, name, role } = req.body;
+
+  try {
+    console.log('Register request body:', req.body);
+    let user;
+    if (email) {
+      // Email-based registration
+     
+
+      // Check if User already exists (edge case)
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        console.log('User already exists for email:', email);
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+
+      // Create new User document
+      user = new User({
+        email,
+        name,
+        role,
+        password: await bcrypt.hash(password, 10),
+        isVerified: true,
+      });
+      await user.save();
+
+      // Delete TempUser record
+    } else if (phone) {
+      // Phone-based registration
+      user = await User.findOne({ phone, isVerified: true });
+      if (!user) {
+        // Create new User document if not exists
+        user = new User({
+          phone,
+          name,
+          role,
+          password: await bcrypt.hash(password, 10),
+          isVerified: true,
+        });
+        await user.save();
+      } else {
+        // Update existing user
+        user.name = name;
+        user.role = role;
+        user.password = await bcrypt.hash(password, 10);
+        await user.save();
+      }
+    } else {
+      console.log('Neither email nor phone provided in register request');
+      return res.status(400).json({ message: 'Email or phone required' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      userId: user._id,
+      isVerified: user.isVerified,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    });
+  } catch (error) {
+    console.error('Error in register:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
 
 // Login
 exports.login = async (req, res) => {

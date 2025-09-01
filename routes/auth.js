@@ -14,6 +14,20 @@ const mongoose = require('mongoose');
 const { OAuth2Client } = require('google-auth-library');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+router.post('/register', authController.register);
+router.post('/login', authController.login);
+router.post('/validate-user', authController.validateUser); // New endpoint
+router.post('/send-email-otp', authController.sendEmailOTP);
+router.post('/verify-email-otp', authController.verifyEmailOTP);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/verify-reset-code', authController.verifyResetCode);
+router.post('/reset-password', authController.resetPassword);
+router.post('/adminregister', authController.adminregister);
+
+// routes/authRoutes.js
+
+
 router.post('/google/mobile', async (req, res) => {
   try {
     const { idToken, name, phone, role } = req.body;
@@ -128,15 +142,6 @@ router.post('/google/mobile', async (req, res) => {
     });
   }
 });
-router.post('/register', authController.register);
-router.post('/login', authController.login);
-router.post('/validate-user', authController.validateUser); // New endpoint
-router.post('/send-email-otp', authController.sendEmailOTP);
-router.post('/verify-email-otp', authController.verifyEmailOTP);
-router.post('/forgot-password', authController.forgotPassword);
-router.post('/verify-reset-code', authController.verifyResetCode);
-router.post('/reset-password', authController.resetPassword);
-// routes/authRoutes.js
 router.get('/:userId', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
