@@ -18,9 +18,7 @@ const profileRoutes = require('./routes/profileRoutes');
 const cityRoutes = require('./routes/city'); // Assuming you have a cityRoutes file
 const postRoutes = require('./routes/postRoutes');
 const reviewRoutes = require('./routes/reviews');
-const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccount.json');
-
+const admin = require('./config/firebase');
 connectDB();
 
 const app = express();

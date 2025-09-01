@@ -1,12 +1,9 @@
 const admin = require('firebase-admin');
-require('dotenv').config(); // Add this line to load environment variables
+
 
 admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-  }),
-});
+  projectId: 'theekadar-9bdf0',
+  clientEmail: 'firebase-adminsdk-fbsvc@theekadar-9bdf0.iam.gserviceaccount.com',
+  privateKey: `-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDIb6bvJpgmluby\n/hQPcF7FmqulSopTWffuhBrhpW7gpAlBvN+gbxSu99nx674r+ul+mMHD9yyVK6KM\nKD0FQrv/abyJQ4t4h0URCSbWyv7NxYqL3+H/gcIhFkc88Ge8OfRZaMBQB4NKp1/3\ne72be0hcDpzijkcRcO/9HJGrHE9fbG+IgEadGOFJPnAJ/iPYGlvIRgRVL60GsSZs\nMWp00P8av10I9OrmQ5AveVMFj1deda9lCtuiUWIUZQRaaYbholMf/eCsiuMxM8wd\nr58FM39RBGfAcqcfIpkcGVKOl8FXNEo2t4l2q2YrA2CuPed/74sqR5w035s8YtfJ\nDkE8wTtDAgMBAAECggEAFe+mSPEj4MFOKFTnVCM7tAuv8mich+/GQyvhF0X4Qwyg\n2Ll3jgLqNBX7G89tojmVOV41gqF4FyFN6mHy/7LkiVkEoc8rIfdH90vVnNddmJ6g\ngZtwi/qjCOT7ye8To1WCaRCeT4Pq+g4kYh0ATNZqvmx4/hCNNZrzIPPx+1SfWTV+\nq6QEmSMeAPGXwFoWQ5AP4cBywsfwgVwoiPwjMbYJOpS8MLNFLcA6qa0wyO+p2K36\npLnrA6oczh0dRC4usItRiB4vQSEyr+7lfK1+qru3BnqqciRudnmXiSawO9nwltii\noBYtlp3GfKBUgC9laMGTQPii6wizxUQyIBVOgvZ72QKBgQD0ZUp1ux1gH3XZNAwH\n3RQm+QUfHrBdXMKDm9hPriJbzsw1canEXlVb3qwtd/U1Rk1MNwhLYr82DrzRX3ds\nLcFOwRVY4RZsei+34asYdBsv10+Y5g55VQ6ojZCEt+yNQg6rP+FRdWMei4r/pJoD\nfhKzqN8u7TJYLr8S3pDnCqKVmwKBgQDR9ATSAGJdDwdvhemXuA39NVILe/bi+Kmh\nJim8LiB6sWfAFjuusdqYQZoSr3m7kzY03Lg1bWmlGUXIdxV6xvAqYoX4zUbkSMdR\nA9tul286kiX9WT6gk+nbyxPhrot+Sy0ruZ1IssPb9j5kn8gh5D0sgQl9jKWmEEzK\nvdwA+WxfeQKBgQCDvhZlYHh1WIAuld/mXUZ/u70HCYQIz/gK+feg/D2JP/DU3nCl\najSZUW9/EysbjMoeS4wtFw38FfWy58N4jTGnQm4/exabY0JV3VBd3jjJkUdXJKyo\nuzErqyQ8ZukdPH6r0cOkJaNI0/AZ3qEnQM7UCjRFF5gL8ScPBOsXoKQEAQKBgEL3\nurHhPX7BVHXWGPQz2QJzB4ByQgWTm0ezjIxhiiqYe6dhcBgA0uDNy/85yXJzOk8S\nOA+Snqfyr7eJhGhtHB3o3yLFF1+pdyn4OP3Ff80G4Oc2mCtQAsAAvo61xfi6seXI\nhsqxepemq7Ac5xEoY/rWDdjmC9A0Uso4VPxakp7BAoGAEMc6QjKfLjS47+4utbbY\n/3HmT9tEUtkpy+CmPzLDVKKpv1HllWYEUQGZ/bbDVmQoPrMOtd/atO3+jPcFXsST\npUZsW2DIhVIo6BC0oJwliKfNXWTxgdEWIIdzX5T/LC/+BSacp0hB+UTYTiwaKWAf\nl8YI/U93JLsw2KHMqc5b3K8=\n-----END PRIVATE KEY-----\n`,});
 
 module.exports = admin;
