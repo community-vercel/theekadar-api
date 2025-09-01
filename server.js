@@ -20,11 +20,7 @@ const postRoutes = require('./routes/postRoutes');
 const reviewRoutes = require('./routes/reviews');
 const admin = require('./config/firebase');
 connectDB();
-
 const app = express();
-
-
-
 app.use(
   helmet({
     contentSecurityPolicy: {
