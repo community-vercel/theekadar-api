@@ -398,6 +398,7 @@ exports.getUserPosts = async (req, res) => {
         $project: {
           postId: '$_id',
           postName: '$title',
+          description: '$description',
           name: '$user.name',
           profileImage: { $ifNull: ['$profile.logo', null] },
            latitude:  { $ifNull: ['$profile.longitude', null] },
