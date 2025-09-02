@@ -58,6 +58,7 @@ exports.getTopPosts = async (req, res) => {
         $project: {
           postId: '$_id',
           postName: '$title',
+          description: '$description',
           name: '$user.name',
           userid:'$user._id',
           profileImage: { $ifNull: ['$profile.logo', null] },
