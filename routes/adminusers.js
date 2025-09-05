@@ -156,9 +156,6 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
-
-
-// Send notification to all users
 router.post('/broadcast-notification', admin(['admin']), async (req, res) => {
   try {
     const { title, body, type = 'general' } = req.body;
