@@ -60,6 +60,7 @@ exports.getTopPosts = async (req, res) => {
           postName: '$title',
           description: '$description',
           name: '$user.name',
+          role:'$user.role',
           userid:'$user._id',
           profileImage: { $ifNull: ['$profile.logo', null] },
           address: { $ifNull: ['$profile.address', null] },
@@ -87,7 +88,6 @@ exports.getTopPosts = async (req, res) => {
           },
         },
       },
-      // Sort by weighted score (descending) and limit to 10
       { $sort: { weightedScore: -1 } },
       { $limit: 50 },
     ]);
