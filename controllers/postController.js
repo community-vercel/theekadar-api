@@ -89,12 +89,12 @@ exports.getTopPosts = async (req, res) => {
       },
       // Sort by weighted score (descending) and limit to 10
       { $sort: { weightedScore: -1 } },
-      { $limit: 10 },
+      { $limit: 50 },
     ]);
 
     res.status(200).json({
       success: true,
-      message: 'Top 10 posts retrieved successfully',
+      message: 'Top 50 posts retrieved successfully',
       data: posts,
     });
   } catch (error) {
